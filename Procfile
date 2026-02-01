@@ -1,0 +1,1 @@
+web: java -jar build/libs/birthday-bot-1.0.jar
