@@ -19,12 +19,17 @@ application {
     mainClass.set("BirthdayBotKt")
 }
 
-tasks.jar {
+tasks.withType<Jar> {
     manifest {
         attributes["Main-Class"] = "BirthdayBotKt"
     }
-    from(configurations.runtimeClasspath.get().map {
-        if (it.isDirectory) it else zipTree(it)
-    })
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(sourceSets.main.get().output)
+
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
+    })
 }
