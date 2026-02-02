@@ -2,4 +2,4 @@
 cmds = ["./gradlew build"]
 
 [phases.start]
-cmd = "java -jar build/libs/birthday-bot-1.0.jar"
+cmd = "java -jar build/libs/BirthdayBot-1.0.jar"
