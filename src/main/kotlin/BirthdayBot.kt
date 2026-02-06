@@ -343,15 +343,16 @@ fun main() {
     val botToken = System.getenv("BOT_TOKEN") ?: throw IllegalArgumentException("BOT_TOKEN not set")
     val botUsername = System.getenv("BOT_USERNAME") ?: throw IllegalArgumentException("BOT_USERNAME not set")
 
-    // Railway provides DATABASE_URL without jdbc: prefix, so we need to add it
-    val rawDatabaseUrl = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/birthday_bot?user=postgres&password=postgres"
-    val databaseUrl = if (rawDatabaseUrl.startsWith("jdbc:")) {
-        rawDatabaseUrl
-    } else {
-        "jdbc:$rawDatabaseUrl"
-    }
+    // Use Railway's individual Postgres variables
+    val pgHost = System.getenv("PGHOST") ?: "localhost"
+    val pgPort = System.getenv("PGPORT") ?: "5432"
+    val pgDatabase = System.getenv("PGDATABASE") ?: "railway"
+    val pgUser = System.getenv("PGUSER") ?: "postgres"
+    val pgPassword = System.getenv("PGPASSWORD") ?: "postgres"
 
-    println("Connecting to database: ${databaseUrl.replace(Regex(":[^:@]+@"), ":****@")}")
+    val databaseUrl = "jdbc:postgresql://$pgHost:$pgPort/$pgDatabase?user=$pgUser&password=$pgPassword&sslmode=require"
+
+    println("Connecting to database at $pgHost:$pgPort...")
 
     // Initialize database
     val database = Database(databaseUrl)
