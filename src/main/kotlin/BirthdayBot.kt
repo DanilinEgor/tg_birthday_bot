@@ -10,21 +10,27 @@ import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.net.URI
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 
 data class Expense(val id: Int, val chatId: Long, val buyerName: String, val amount: BigDecimal)
 
-class Database(private val dbUrl: String) {
+class Database(
+    private val dbUrl: String,
+    private val username: String,
+    private val password: String,
+) {
 
     private fun getConnection(): Connection {
-        return DriverManager.getConnection(dbUrl)
+        return DriverManager.getConnection(dbUrl, username, password)
     }
 
     fun initialize() {
         getConnection().use { conn ->
-            conn.createStatement().execute("""
+            conn.createStatement().execute(
+                """
                 CREATE TABLE IF NOT EXISTS expenses (
                     id SERIAL PRIMARY KEY,
                     chat_id BIGINT NOT NULL,
@@ -32,7 +38,8 @@ class Database(private val dbUrl: String) {
                     amount DECIMAL(10, 2) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
+            """
+            )
         }
     }
 
@@ -150,6 +157,7 @@ class BirthdayBot(
                 database.clearExpenses(chatId)
                 editMessage(chatId, messageId, "🔄 All expenses cleared! Ready for a new event.")
             }
+
             "reset_cancel" -> {
                 editMessage(chatId, messageId, "❌ Reset cancelled. Your expenses are safe.")
             }
@@ -277,7 +285,11 @@ class BirthdayBot(
             appendLine("🔔 Payment Reminder!")
             appendLine()
             owes.forEach { (name, amount) ->
-                appendLine("${name} please transfer €${amount.abs().setScale(2, RoundingMode.HALF_UP)}")
+                appendLine(
+                    "${name} please transfer €${
+                        amount.abs().setScale(2, RoundingMode.HALF_UP)
+                    }"
+                )
             }
             appendLine()
             appendLine("Use /calculate to see full breakdown")
@@ -341,18 +353,20 @@ class BirthdayBot(
 
 fun main() {
     val botToken = System.getenv("BOT_TOKEN") ?: throw IllegalArgumentException("BOT_TOKEN not set")
-    val botUsername = System.getenv("BOT_USERNAME") ?: throw IllegalArgumentException("BOT_USERNAME not set")
+    val botUsername =
+        System.getenv("BOT_USERNAME") ?: throw IllegalArgumentException("BOT_USERNAME not set")
 
     // Parse Railway's DATABASE_URL: postgresql://user:pass@host:port/database
-    val databaseUrl = System.getenv("DATABASE_URL") ?: throw IllegalArgumentException("DATABASE_URL not set")
+    val databaseUrl =
+        System.getenv("DATABASE_URL") ?: throw IllegalArgumentException("DATABASE_URL not set")
 
-    // Convert postgresql:// to jdbc:postgresql://
-    val jdbcUrl = databaseUrl.replace("^postgresql://".toRegex(), "jdbc:postgresql://") + "?sslmode=require"
+    val uri = URI(databaseUrl)
+    val userInfo = uri.userInfo.split(":")
 
-    println("Connecting to database...")
+    val jdbcUrl = "jdbc:postgresql://${uri.host}:${uri.port}${uri.path}"
 
     // Initialize database
-    val database = Database(jdbcUrl)
+    val database = Database(jdbcUrl, userInfo[0], userInfo[1])
     database.initialize()
 
     val botsApi = TelegramBotsApi(DefaultBotSession::class.java)
