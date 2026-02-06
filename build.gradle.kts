@@ -13,6 +13,7 @@ repositories {
 dependencies {
     implementation("org.telegram:telegrambots:6.9.7.1")
     implementation("org.slf4j:slf4j-simple:2.0.9")
+    implementation("org.postgresql:postgresql:42.7.1")
 }
 
 application {
