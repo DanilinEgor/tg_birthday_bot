@@ -342,7 +342,16 @@ class BirthdayBot(
 fun main() {
     val botToken = System.getenv("BOT_TOKEN") ?: throw IllegalArgumentException("BOT_TOKEN not set")
     val botUsername = System.getenv("BOT_USERNAME") ?: throw IllegalArgumentException("BOT_USERNAME not set")
-    val databaseUrl = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/birthday_bot?user=postgres&password=postgres"
+
+    // Railway provides DATABASE_URL without jdbc: prefix, so we need to add it
+    val rawDatabaseUrl = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/birthday_bot?user=postgres&password=postgres"
+    val databaseUrl = if (rawDatabaseUrl.startsWith("jdbc:")) {
+        rawDatabaseUrl
+    } else {
+        "jdbc:$rawDatabaseUrl"
+    }
+
+    println("Connecting to database: ${databaseUrl.replace(Regex(":[^:@]+@"), ":****@")}")
 
     // Initialize database
     val database = Database(databaseUrl)
