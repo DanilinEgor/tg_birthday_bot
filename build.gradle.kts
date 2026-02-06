@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.22"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
     application
 }
 
@@ -18,19 +19,4 @@ dependencies {
 
 application {
     mainClass.set("BirthdayBotKt")
-}
-
-tasks.withType<Jar> {
-    manifest {
-        attributes["Main-Class"] = "BirthdayBotKt"
-    }
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    from(sourceSets.main.get().output)
-
-    dependsOn(configurations.runtimeClasspath)
-    from({
-        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
-    })
 }
