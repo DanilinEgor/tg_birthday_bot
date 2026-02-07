@@ -136,7 +136,7 @@ class Database(private val dbUrl: String, private val user: String, private val 
                     Participant(
                         rs.getInt("id"),
                         rs.getLong("chat_id"),
-                        rs.getString("buyer_name")
+                        rs.getString("name")
                     )
                 )
             }
