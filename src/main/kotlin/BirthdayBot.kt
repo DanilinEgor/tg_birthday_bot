@@ -40,17 +40,17 @@ class BirthdayBot(
     private fun setupCommands() {
         try {
             val commands = listOf(
-                BotCommand("start", "Show welcome message"),
-                BotCommand("addexpense", "Add an expense (name amount)"),
-                BotCommand("add", "Add participants (name1 name2 ...)"),
-                BotCommand("removeparticipant", "Remove a participant (name)"),
-                BotCommand("setpayment", "Set payment details for reminders"),
-                BotCommand("participants", "List all participants"),
-                BotCommand("status", "View all expenses"),
-                BotCommand("calculate", "Calculate who owes what"),
-                BotCommand("notify", "Send payment reminders"),
-                BotCommand("reset", "Clear all expenses and participants"),
-                BotCommand("help", "Show help message")
+                BotCommand("start", "Приветствие"),
+                BotCommand("addexpense", "Добавить расход (@юзер сумма)"),
+                BotCommand("add", "Добавить участников (@юзер1 @юзер2 ...)"),
+                BotCommand("removeparticipant", "Удалить участника (@юзер)"),
+                BotCommand("setpayment", "Реквизиты для перевода"),
+                BotCommand("participants", "Список участников"),
+                BotCommand("status", "Все расходы"),
+                BotCommand("calculate", "Расчёт долгов"),
+                BotCommand("notify", "Напомнить должникам"),
+                BotCommand("reset", "Очистить все данные"),
+                BotCommand("help", "Помощь")
             )
             execute(SetMyCommands().apply { this.commands = commands })
         } catch (e: Exception) {
@@ -82,7 +82,7 @@ class BirthdayBot(
             val chatIds = database.getActiveChatIds()
             for (chatId in chatIds) {
                 val message = commandHandler.handleNotify(chatId)
-                if (!message.startsWith("❌") && !message.contains("No one owes money")) {
+                if (!message.startsWith("❌") && !message.contains("Все долги оплачены")) {
                     sendMessage(chatId, message)
                 }
             }
@@ -111,9 +111,9 @@ class BirthdayBot(
                 database.addExpense(chatId, pendingName, amount)
                 database.addParticipant(chatId, pendingName)
                 pendingExpense.remove(chatId)
-                sendMessage(chatId, "✅ Added expense: $pendingName spent €${amount.setScale(2, RoundingMode.HALF_UP)}")
+                sendMessage(chatId, "✅ Расход добавлен: $pendingName потратил(а) €${amount.setScale(2, RoundingMode.HALF_UP)}")
             } else {
-                sendMessage(chatId, "❌ Please send a valid positive number for the amount.")
+                sendMessage(chatId, "❌ Отправь корректное положительное число.")
             }
             return
         }
@@ -162,10 +162,10 @@ class BirthdayBot(
                 database.clearExpenses(chatId)
                 database.clearParticipants(chatId)
                 database.clearPaidDebts(chatId)
-                editMessage(chatId, messageId, "🔄 All expenses and participants cleared! Ready for a new event.")
+                editMessage(chatId, messageId, "🔄 Все расходы и участники удалены! Готово к новому событию.")
             }
             data == "reset_cancel" -> {
-                editMessage(chatId, messageId, "❌ Reset cancelled. Your data is safe.")
+                editMessage(chatId, messageId, "❌ Сброс отменён. Данные сохранены.")
             }
             // Main menu callbacks
             data == "menu_participants" -> sendParticipantList(chatId)
@@ -181,13 +181,13 @@ class BirthdayBot(
                 editParticipantList(chatId, messageId)
             }
             data == "add_part_hint" -> {
-                sendMessage(chatId, "Send participant usernames:\n/add @Alice @Bob @Charlie")
+                sendMessage(chatId, "Отправь юзернеймы участников:\n/add @Alice @Bob @Charlie")
             }
             // Expense picker callbacks
             data.startsWith("expense_pick:") -> {
                 val name = data.removePrefix("expense_pick:")
                 pendingExpense[chatId] = name
-                editMessage(chatId, messageId, "💰 Adding expense for *$name*. Send the amount:")
+                editMessage(chatId, messageId, "💰 Добавляю расход для *$name*. Отправь сумму:")
             }
             // Mark debt as paid callbacks
             data.startsWith("mark_paid:") -> {
@@ -204,16 +204,16 @@ class BirthdayBot(
         val keyboard = InlineKeyboardMarkup()
         keyboard.keyboard = listOf(
             listOf(
-                InlineKeyboardButton("👥 Participants").apply { callbackData = "menu_participants" },
-                InlineKeyboardButton("💰 Add Expense").apply { callbackData = "menu_addexpense" }
+                InlineKeyboardButton("👥 Участники").apply { callbackData = "menu_participants" },
+                InlineKeyboardButton("💰 Добавить расход").apply { callbackData = "menu_addexpense" }
             ),
             listOf(
-                InlineKeyboardButton("📊 Status").apply { callbackData = "menu_status" },
-                InlineKeyboardButton("💵 Calculate").apply { callbackData = "menu_calculate" }
+                InlineKeyboardButton("📊 Расходы").apply { callbackData = "menu_status" },
+                InlineKeyboardButton("💵 Расчёт").apply { callbackData = "menu_calculate" }
             ),
             listOf(
-                InlineKeyboardButton("🔔 Notify").apply { callbackData = "menu_notify" },
-                InlineKeyboardButton("🔄 Reset").apply { callbackData = "menu_reset" }
+                InlineKeyboardButton("🔔 Напомнить").apply { callbackData = "menu_notify" },
+                InlineKeyboardButton("🔄 Сброс").apply { callbackData = "menu_reset" }
             )
         )
         sendMessageWithKeyboard(chatId, commandHandler.getHelpMessage(), keyboard)
@@ -223,7 +223,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            sendMessage(chatId, "No participants yet. Use /add @Name1 @Name2 to add people.")
+            sendMessage(chatId, "Участников пока нет. Используй /add @Name1 @Name2 для добавления.")
             return
         }
 
@@ -240,7 +240,7 @@ class BirthdayBot(
             })
         }
         rows.add(listOf(
-            InlineKeyboardButton("➕ Add Participant").apply { callbackData = "add_part_hint" }
+            InlineKeyboardButton("➕ Добавить участника").apply { callbackData = "add_part_hint" }
         ))
         keyboard.keyboard = rows
 
@@ -251,7 +251,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            editMessage(chatId, messageId, "👥 No participants left. Use /add @Name1 @Name2 to add people.")
+            editMessage(chatId, messageId, "👥 Участников не осталось. Используй /add @Name1 @Name2 для добавления.")
             return
         }
 
@@ -268,7 +268,7 @@ class BirthdayBot(
             })
         }
         rows.add(listOf(
-            InlineKeyboardButton("➕ Add Participant").apply { callbackData = "add_part_hint" }
+            InlineKeyboardButton("➕ Добавить участника").apply { callbackData = "add_part_hint" }
         ))
         keyboard.keyboard = rows
 
@@ -279,7 +279,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            sendMessage(chatId, "No participants yet. Add some first with /add")
+            sendMessage(chatId, "Участников пока нет. Сначала добавь через /add")
             return
         }
 
@@ -291,7 +291,7 @@ class BirthdayBot(
         }
         keyboard.keyboard = rows
 
-        sendMessageWithKeyboard(chatId, "Who paid?", keyboard)
+        sendMessageWithKeyboard(chatId, "Кто платил?", keyboard)
     }
 
     private fun sendCalculateWithButtons(chatId: Long) {
@@ -306,7 +306,7 @@ class BirthdayBot(
         val keyboard = InlineKeyboardMarkup()
         keyboard.keyboard = unpaidDebts.map { (name, amount) ->
             val formatted = amount.setScale(2, RoundingMode.HALF_UP)
-            listOf(InlineKeyboardButton("✅ Mark $name (€$formatted) as paid").apply {
+            listOf(InlineKeyboardButton("✅ $name (€$formatted) оплачено").apply {
                 callbackData = "mark_paid:$name:$formatted"
             })
         }
@@ -326,7 +326,7 @@ class BirthdayBot(
         val keyboard = InlineKeyboardMarkup()
         keyboard.keyboard = unpaidDebts.map { (name, amount) ->
             val formatted = amount.setScale(2, RoundingMode.HALF_UP)
-            listOf(InlineKeyboardButton("✅ Mark $name (€$formatted) as paid").apply {
+            listOf(InlineKeyboardButton("✅ $name (€$formatted) оплачено").apply {
                 callbackData = "mark_paid:$name:$formatted"
             })
         }
@@ -337,12 +337,12 @@ class BirthdayBot(
     private fun handleResetWithConfirmation(chatId: Long) {
         val keyboard = InlineKeyboardMarkup()
         val row = listOf(
-            InlineKeyboardButton("✅ Yes, clear all").apply { callbackData = "reset_confirm" },
-            InlineKeyboardButton("❌ No, cancel").apply { callbackData = "reset_cancel" }
+            InlineKeyboardButton("✅ Да, очистить всё").apply { callbackData = "reset_confirm" },
+            InlineKeyboardButton("❌ Нет, отмена").apply { callbackData = "reset_cancel" }
         )
         keyboard.keyboard = listOf(row)
 
-        sendMessageWithKeyboard(chatId, "⚠️ Are you sure you want to clear all expenses and participants for this chat?", keyboard)
+        sendMessageWithKeyboard(chatId, "⚠️ Уверен, что хочешь удалить все расходы и участников в этом чате?", keyboard)
     }
 
     private fun sendMessage(chatId: Long, text: String) {

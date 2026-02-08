@@ -9,14 +9,14 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleAddExpense(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 3) {
-            return "❌ Usage: /addexpense [@username] [amount]\nExample: /addexpense @John 50"
+            return "❌ Формат: /addexpense [@юзернейм] [сумма]\nПример: /addexpense @Ivan 50"
         }
 
         val name = normalizeUsername(parts[1])
         val amount = parts[2].toBigDecimalOrNull()
 
         if (amount == null || amount <= BigDecimal.ZERO) {
-            return "❌ Please provide a valid positive amount"
+            return "❌ Укажите корректную положительную сумму"
         }
 
         database.addExpense(chatId, name, amount)
@@ -24,13 +24,13 @@ class CommandHandler(private val database: DatabaseOperations) {
         // Auto-add as participant if not already added
         database.addParticipant(chatId, name)
 
-        return "✅ Added expense: $name spent €${amount.setScale(2, RoundingMode.HALF_UP)}"
+        return "✅ Расход добавлен: $name потратил(а) €${amount.setScale(2, RoundingMode.HALF_UP)}"
     }
 
     fun handleAddParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /add [@username1] [@username2] ...\nExample: /add @Alice @Bob @Charlie"
+            return "❌ Формат: /add @юзер1 @юзер2 ...\nПример: /add @Alice @Bob @Charlie"
         }
 
         val names = parts.drop(1).map { normalizeUsername(it) }
@@ -38,9 +38,9 @@ class CommandHandler(private val database: DatabaseOperations) {
             val name = names[0]
             val participant = database.addParticipant(chatId, name)
             return if (participant != null) {
-                "✅ Added $name to participants list"
+                "✅ $name добавлен(а) в список участников"
             } else {
-                "⚠️ $name is already in the participants list"
+                "⚠️ $name уже в списке участников"
             }
         }
 
@@ -55,25 +55,25 @@ class CommandHandler(private val database: DatabaseOperations) {
         }
 
         return buildString {
-            if (added.isNotEmpty()) append("✅ Added: ${added.joinToString(", ")}")
+            if (added.isNotEmpty()) append("✅ Добавлены: ${added.joinToString(", ")}")
             if (added.isNotEmpty() && existed.isNotEmpty()) append("\n")
-            if (existed.isNotEmpty()) append("⚠️ Already existed: ${existed.joinToString(", ")}")
+            if (existed.isNotEmpty()) append("⚠️ Уже были: ${existed.joinToString(", ")}")
         }
     }
 
     fun handleRemoveParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /removeparticipant [@username]\nExample: /removeparticipant @Alice"
+            return "❌ Формат: /removeparticipant [@юзернейм]\nПример: /removeparticipant @Alice"
         }
 
         val name = normalizeUsername(parts[1])
         val removed = database.removeParticipant(chatId, name)
 
         return if (removed) {
-            "✅ Removed $name from participants list"
+            "✅ $name удалён из списка участников"
         } else {
-            "❌ $name is not in the participants list"
+            "❌ $name нет в списке участников"
         }
     }
 
@@ -81,11 +81,11 @@ class CommandHandler(private val database: DatabaseOperations) {
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            return "📋 No participants yet.\nUse /add to add people."
+            return "📋 Участников пока нет.\nИспользуй /add для добавления."
         }
 
         val list = buildString {
-            appendLine("📋 Participants (${participants.size}):")
+            appendLine("📋 Участники (${participants.size}):")
             appendLine()
             participants.forEach {
                 appendLine("👤 ${it.name}")
@@ -98,18 +98,18 @@ class CommandHandler(private val database: DatabaseOperations) {
         val expenses = database.getExpenses(chatId)
 
         if (expenses.isEmpty()) {
-            return "📊 No expenses recorded yet.\nUse /addexpense to add expenses."
+            return "📊 Расходов пока нет.\nИспользуй /addexpense для добавления."
         }
 
         val total = expenses.sumOf { it.amount }
         val status = buildString {
-            appendLine("📊 Current Status:")
+            appendLine("📊 Текущие расходы:")
             appendLine()
             expenses.forEach {
                 appendLine("💰 ${it.buyerName}: €${it.amount.setScale(2, RoundingMode.HALF_UP)}")
             }
             appendLine()
-            appendLine("Total spent: €${total.setScale(2, RoundingMode.HALF_UP)}")
+            appendLine("Итого: €${total.setScale(2, RoundingMode.HALF_UP)}")
         }
         return status
     }
@@ -142,11 +142,11 @@ class CommandHandler(private val database: DatabaseOperations) {
         val participants = database.getParticipants(chatId)
 
         if (expenses.isEmpty()) {
-            return "❌ No expenses to calculate. Add expenses first with /addexpense"
+            return "❌ Нет расходов для расчёта. Сначала добавь через /addexpense"
         }
 
         if (participants.isEmpty()) {
-            return "❌ No participants added. Add participants with /add"
+            return "❌ Нет участников. Добавь через /add"
         }
 
         val total = expenses.sumOf { it.amount }
@@ -168,30 +168,30 @@ class CommandHandler(private val database: DatabaseOperations) {
         }
 
         val result = buildString {
-            appendLine("💵 Payment Calculation:")
+            appendLine("💵 Расчёт:")
             appendLine()
-            appendLine("Total: €${total.setScale(2, RoundingMode.HALF_UP)}")
-            appendLine("Participants: $peopleCount")
-            appendLine("Per person: €${perPerson.setScale(2, RoundingMode.HALF_UP)}")
+            appendLine("Итого: €${total.setScale(2, RoundingMode.HALF_UP)}")
+            appendLine("Участников: $peopleCount")
+            appendLine("На каждого: €${perPerson.setScale(2, RoundingMode.HALF_UP)}")
             appendLine()
 
             val rawOwes = rawBalances.filter { it.value < BigDecimal.ZERO }
             val receives = rawBalances.filter { it.value > BigDecimal.ZERO }
 
             if (rawOwes.isEmpty()) {
-                appendLine("✅ Everyone is settled up!")
+                appendLine("✅ Все в расчёте!")
             } else {
-                appendLine("💸 Who owes money:")
+                appendLine("💸 Кто должен:")
                 rawOwes.forEach { (name, amount) ->
                     val adjusted = adjustedBalances[name] ?: amount
                     if (adjusted >= BigDecimal.ZERO) {
-                        appendLine("   ✅ ${name}: €${amount.abs().setScale(2, RoundingMode.HALF_UP)} (paid)")
+                        appendLine("   ✅ ${name}: €${amount.abs().setScale(2, RoundingMode.HALF_UP)} (оплачено)")
                     } else {
                         appendLine("   ${name}: €${adjusted.abs().setScale(2, RoundingMode.HALF_UP)}")
                     }
                 }
                 appendLine()
-                appendLine("💰 Who should receive:")
+                appendLine("💰 Кому вернуть:")
                 receives.forEach { (name, amount) ->
                     appendLine("   ${name}: €${amount.setScale(2, RoundingMode.HALF_UP)}")
                 }
@@ -206,33 +206,33 @@ class CommandHandler(private val database: DatabaseOperations) {
         val participants = database.getParticipants(chatId)
 
         if (expenses.isEmpty()) {
-            return "❌ No expenses to notify about. Add expenses first."
+            return "❌ Нет расходов. Сначала добавь расходы."
         }
 
         if (participants.isEmpty()) {
-            return "❌ No participants added. Add participants with /add"
+            return "❌ Нет участников. Добавь через /add"
         }
 
         val unpaidDebts = getUnpaidDebts(chatId)
 
         if (unpaidDebts.isEmpty()) {
-            return "✅ No one owes money!"
+            return "✅ Все долги оплачены!"
         }
 
         val paymentInfo = database.getPaymentInfo(chatId)
 
         val notification = buildString {
-            appendLine("🔔 Payment Reminder!")
+            appendLine("🔔 Напоминание об оплате!")
             appendLine()
             unpaidDebts.forEach { (name, amount) ->
-                appendLine("${name} please transfer €${amount.setScale(2, RoundingMode.HALF_UP)}")
+                appendLine("$name, переведи €${amount.setScale(2, RoundingMode.HALF_UP)}")
             }
             if (paymentInfo != null) {
                 appendLine()
                 appendLine("💳 $paymentInfo")
             }
             appendLine()
-            appendLine("Use /calculate to see full breakdown")
+            appendLine("/calculate — подробный расчёт")
         }
 
         return notification
@@ -241,26 +241,32 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleSetPayment(chatId: Long, text: String): String {
         val info = text.substringAfter(" ", "").trim()
         if (info.isEmpty()) {
-            return "❌ Usage: /setpayment [card number or phone]\nExample: /setpayment Card: 1234 5678 9012 3456"
+            return "❌ Формат: /setpayment [номер карты или телефон]\nПример: /setpayment Карта: 1234 5678 9012 3456"
         }
         database.setPaymentInfo(chatId, info)
-        return "✅ Payment info saved: $info"
+        return "✅ Реквизиты сохранены: $info"
     }
 
     fun getHelpMessage(): String {
         return """
-            🎉 Birthday Gift Bot
+            🎉 Бот для совместных расходов
 
-            /add [@usernames] - Add people (e.g. @Alice @Bob)
-            /addexpense [@username] [amount] - Record an expense
-            /participants - List all participants
-            /status - View all expenses
-            /calculate - Calculate who owes what
-            /notify - Send payment reminders
-            /setpayment [info] - Set payment details for reminders
-            /reset - Clear all data
+            Как пользоваться:
+            1. Добавь участников: /add @user1 @user2 ...
+            2. Нажми 💰 Добавить расход и выбери, кто платил
+            3. Посмотри расчёт через 💵 Расчёт
 
-            💡 Use the buttons below or type commands!
+            Команды:
+            /add — добавить участников
+            /addexpense — добавить расход
+            /participants — список участников
+            /status — все расходы
+            /calculate — расчёт долгов
+            /notify — напомнить должникам
+            /setpayment — реквизиты для перевода
+            /reset — очистить все данные
+
+            💡 Используй кнопки ниже!
         """.trimIndent()
     }
 }

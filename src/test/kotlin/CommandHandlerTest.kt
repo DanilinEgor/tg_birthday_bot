@@ -34,7 +34,7 @@ class CommandHandlerTest {
                 Participant(1, CHAT_ID, "@Alice")
 
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense @Alice 50")
-        assertContains(result, "@Alice spent €50.00")
+        assertContains(result, "@Alice потратил(а) €50.00")
         verify { database.addExpense(CHAT_ID, "@Alice", BigDecimal("50")) }
         verify { database.addParticipant(CHAT_ID, "@Alice") }
     }
@@ -42,31 +42,31 @@ class CommandHandlerTest {
     @Test
     fun `addExpense with missing args returns usage`() {
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense")
-        assertContains(result, "Usage: /addexpense")
+        assertContains(result, "/addexpense")
     }
 
     @Test
     fun `addExpense with missing amount returns usage`() {
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense Alice")
-        assertContains(result, "Usage: /addexpense")
+        assertContains(result, "/addexpense")
     }
 
     @Test
     fun `addExpense with invalid amount returns error`() {
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense Alice abc")
-        assertContains(result, "valid positive amount")
+        assertContains(result, "корректную положительную сумму")
     }
 
     @Test
     fun `addExpense with zero amount returns error`() {
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense Alice 0")
-        assertContains(result, "valid positive amount")
+        assertContains(result, "корректную положительную сумму")
     }
 
     @Test
     fun `addExpense with negative amount returns error`() {
         val result = handler.handleAddExpense(CHAT_ID, "/addexpense Alice -10")
-        assertContains(result, "valid positive amount")
+        assertContains(result, "корректную положительную сумму")
     }
 
     // --- /add ---
@@ -76,7 +76,7 @@ class CommandHandlerTest {
         every { database.addParticipant(CHAT_ID, "@Alice") } returns Participant(1, CHAT_ID, "@Alice")
 
         val result = handler.handleAddParticipant(CHAT_ID, "/add @Alice")
-        assertContains(result, "Added @Alice to participants list")
+        assertContains(result, "@Alice добавлен(а)")
     }
 
     @Test
@@ -84,7 +84,7 @@ class CommandHandlerTest {
         every { database.addParticipant(CHAT_ID, "@Alice") } returns Participant(1, CHAT_ID, "@Alice")
 
         val result = handler.handleAddParticipant(CHAT_ID, "/add Alice")
-        assertContains(result, "Added @Alice to participants list")
+        assertContains(result, "@Alice добавлен(а)")
         verify { database.addParticipant(CHAT_ID, "@Alice") }
     }
 
@@ -93,13 +93,13 @@ class CommandHandlerTest {
         every { database.addParticipant(CHAT_ID, "@Alice") } returns null
 
         val result = handler.handleAddParticipant(CHAT_ID, "/add @Alice")
-        assertContains(result, "already in the participants list")
+        assertContains(result, "уже в списке участников")
     }
 
     @Test
     fun `addParticipant with missing args returns usage`() {
         val result = handler.handleAddParticipant(CHAT_ID, "/add")
-        assertContains(result, "Usage: /add")
+        assertContains(result, "/add")
     }
 
     @Test
@@ -109,7 +109,7 @@ class CommandHandlerTest {
         every { database.addParticipant(CHAT_ID, "@Charlie") } returns Participant(3, CHAT_ID, "@Charlie")
 
         val result = handler.handleAddParticipant(CHAT_ID, "/add @Alice @Bob @Charlie")
-        assertContains(result, "Added: @Alice, @Bob, @Charlie")
+        assertContains(result, "Добавлены: @Alice, @Bob, @Charlie")
     }
 
     @Test
@@ -119,8 +119,8 @@ class CommandHandlerTest {
         every { database.addParticipant(CHAT_ID, "@Charlie") } returns Participant(3, CHAT_ID, "@Charlie")
 
         val result = handler.handleAddParticipant(CHAT_ID, "/add @Alice @Bob @Charlie")
-        assertContains(result, "Added: @Alice, @Charlie")
-        assertContains(result, "Already existed: @Bob")
+        assertContains(result, "Добавлены: @Alice, @Charlie")
+        assertContains(result, "Уже были: @Bob")
     }
 
     // --- /removeparticipant ---
@@ -130,7 +130,7 @@ class CommandHandlerTest {
         every { database.removeParticipant(CHAT_ID, "@Alice") } returns true
 
         val result = handler.handleRemoveParticipant(CHAT_ID, "/removeparticipant @Alice")
-        assertContains(result, "Removed @Alice from participants list")
+        assertContains(result, "@Alice удалён")
     }
 
     @Test
@@ -138,13 +138,13 @@ class CommandHandlerTest {
         every { database.removeParticipant(CHAT_ID, "@Alice") } returns false
 
         val result = handler.handleRemoveParticipant(CHAT_ID, "/removeparticipant @Alice")
-        assertContains(result, "not in the participants list")
+        assertContains(result, "нет в списке участников")
     }
 
     @Test
     fun `removeParticipant with missing args returns usage`() {
         val result = handler.handleRemoveParticipant(CHAT_ID, "/removeparticipant")
-        assertContains(result, "Usage: /removeparticipant")
+        assertContains(result, "/removeparticipant")
     }
 
     // --- /participants ---
@@ -157,7 +157,7 @@ class CommandHandlerTest {
         )
 
         val result = handler.handleListParticipants(CHAT_ID)
-        assertContains(result, "Participants (2)")
+        assertContains(result, "Участники (2)")
         assertContains(result, "Alice")
         assertContains(result, "Bob")
     }
@@ -167,7 +167,7 @@ class CommandHandlerTest {
         every { database.getParticipants(CHAT_ID) } returns emptyList()
 
         val result = handler.handleListParticipants(CHAT_ID)
-        assertContains(result, "No participants yet")
+        assertContains(result, "Участников пока нет")
     }
 
     // --- /status ---
@@ -182,7 +182,7 @@ class CommandHandlerTest {
         val result = handler.handleStatus(CHAT_ID)
         assertContains(result, "Alice: €60.00")
         assertContains(result, "Bob: €40.00")
-        assertContains(result, "Total spent: €100.00")
+        assertContains(result, "Итого: €100.00")
     }
 
     @Test
@@ -190,7 +190,7 @@ class CommandHandlerTest {
         every { database.getExpenses(CHAT_ID) } returns emptyList()
 
         val result = handler.handleStatus(CHAT_ID)
-        assertContains(result, "No expenses recorded yet")
+        assertContains(result, "Расходов пока нет")
     }
 
     // --- /calculate ---
@@ -208,11 +208,11 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleCalculate(CHAT_ID)
-        assertContains(result, "Total: €90.00")
-        assertContains(result, "Participants: 3")
-        assertContains(result, "Per person: €30.00")
-        assertContains(result, "Who owes money")
-        assertContains(result, "Who should receive")
+        assertContains(result, "Итого: €90.00")
+        assertContains(result, "Участников: 3")
+        assertContains(result, "На каждого: €30.00")
+        assertContains(result, "Кто должен")
+        assertContains(result, "Кому вернуть")
     }
 
     @Test
@@ -220,7 +220,7 @@ class CommandHandlerTest {
         every { database.getExpenses(CHAT_ID) } returns emptyList()
 
         val result = handler.handleCalculate(CHAT_ID)
-        assertContains(result, "No expenses to calculate")
+        assertContains(result, "Нет расходов")
     }
 
     @Test
@@ -231,7 +231,7 @@ class CommandHandlerTest {
         every { database.getParticipants(CHAT_ID) } returns emptyList()
 
         val result = handler.handleCalculate(CHAT_ID)
-        assertContains(result, "No participants added")
+        assertContains(result, "Нет участников")
     }
 
     @Test
@@ -247,7 +247,7 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleCalculate(CHAT_ID)
-        assertContains(result, "Everyone is settled up!")
+        assertContains(result, "Все в расчёте!")
     }
 
     @Test
@@ -263,7 +263,7 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns mapOf("Bob" to BigDecimal("30.00"))
 
         val result = handler.handleCalculate(CHAT_ID)
-        assertContains(result, "✅ Bob: €30.00 (paid)")
+        assertContains(result, "✅ Bob: €30.00 (оплачено)")
         assertContains(result, "Charlie: €30.00")
     }
 
@@ -282,8 +282,8 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "Payment Reminder")
-        assertContains(result, "please transfer")
+        assertContains(result, "Напоминание об оплате")
+        assertContains(result, "переведи")
     }
 
     @Test
@@ -291,7 +291,7 @@ class CommandHandlerTest {
         every { database.getExpenses(CHAT_ID) } returns emptyList()
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "No expenses to notify about")
+        assertContains(result, "Нет расходов")
     }
 
     @Test
@@ -302,7 +302,7 @@ class CommandHandlerTest {
         every { database.getParticipants(CHAT_ID) } returns emptyList()
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "No participants added")
+        assertContains(result, "Нет участников")
     }
 
     @Test
@@ -318,7 +318,7 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "No one owes money")
+        assertContains(result, "Все долги оплачены")
     }
 
     @Test
@@ -335,9 +335,9 @@ class CommandHandlerTest {
         every { database.getPaidDebts(CHAT_ID) } returns mapOf("Bob" to BigDecimal("30.00"))
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "Payment Reminder")
-        assertContains(result, "Charlie please transfer")
-        assertTrue { !result.contains("Bob please transfer") }
+        assertContains(result, "Напоминание об оплате")
+        assertContains(result, "Charlie, переведи")
+        assertTrue { !result.contains("Bob, переведи") }
     }
 
     @Test
@@ -356,23 +356,23 @@ class CommandHandlerTest {
         )
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "No one owes money")
+        assertContains(result, "Все долги оплачены")
     }
 
     // --- /setpayment ---
 
     @Test
     fun `setPayment with info returns success`() {
-        val result = handler.handleSetPayment(CHAT_ID, "/setpayment Card: 1234 5678 9012 3456")
-        assertContains(result, "Payment info saved")
-        assertContains(result, "Card: 1234 5678 9012 3456")
-        verify { database.setPaymentInfo(CHAT_ID, "Card: 1234 5678 9012 3456") }
+        val result = handler.handleSetPayment(CHAT_ID, "/setpayment Карта: 1234 5678 9012 3456")
+        assertContains(result, "Реквизиты сохранены")
+        assertContains(result, "Карта: 1234 5678 9012 3456")
+        verify { database.setPaymentInfo(CHAT_ID, "Карта: 1234 5678 9012 3456") }
     }
 
     @Test
     fun `setPayment with no args returns usage`() {
         val result = handler.handleSetPayment(CHAT_ID, "/setpayment")
-        assertContains(result, "Usage: /setpayment")
+        assertContains(result, "/setpayment")
     }
 
     @Test
@@ -385,10 +385,10 @@ class CommandHandlerTest {
             Participant(2, CHAT_ID, "Bob")
         )
         every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
-        every { database.getPaymentInfo(CHAT_ID) } returns "Card: 1234 5678 9012 3456"
+        every { database.getPaymentInfo(CHAT_ID) } returns "Карта: 1234 5678 9012 3456"
 
         val result = handler.handleNotify(CHAT_ID)
-        assertContains(result, "Card: 1234 5678 9012 3456")
+        assertContains(result, "Карта: 1234 5678 9012 3456")
     }
 
     // --- /help ---
@@ -396,7 +396,7 @@ class CommandHandlerTest {
     @Test
     fun `getHelpMessage returns expected content`() {
         val result = handler.getHelpMessage()
-        assertContains(result, "Birthday Gift Bot")
+        assertContains(result, "Бот для совместных расходов")
         assertContains(result, "/addexpense")
         assertContains(result, "/add")
         assertContains(result, "/calculate")
@@ -426,61 +426,61 @@ class CommandHandlerTest {
         fun `typical workflow - add participants, expenses, calculate, notify`() {
             // 1. Add participants
             var result = flowHandler.handleAddParticipant(flowChatId, "/add @Alice")
-            assertContains(result, "Added @Alice")
+            assertContains(result, "@Alice добавлен(а)")
 
             result = flowHandler.handleAddParticipant(flowChatId, "/add @Bob")
-            assertContains(result, "Added @Bob")
+            assertContains(result, "@Bob добавлен(а)")
 
             result = flowHandler.handleAddParticipant(flowChatId, "/add @Charlie")
-            assertContains(result, "Added @Charlie")
+            assertContains(result, "@Charlie добавлен(а)")
 
             // 2. Verify participants list
             result = flowHandler.handleListParticipants(flowChatId)
-            assertContains(result, "Participants (3)")
+            assertContains(result, "Участники (3)")
             assertContains(result, "@Alice")
             assertContains(result, "@Bob")
             assertContains(result, "@Charlie")
 
             // 3. Add expenses - Alice bought the gift, Bob bought food
             result = flowHandler.handleAddExpense(flowChatId, "/addexpense @Alice 60")
-            assertContains(result, "@Alice spent €60.00")
+            assertContains(result, "@Alice потратил(а) €60.00")
 
             result = flowHandler.handleAddExpense(flowChatId, "/addexpense @Bob 30")
-            assertContains(result, "@Bob spent €30.00")
+            assertContains(result, "@Bob потратил(а) €30.00")
 
             // 4. Check status
             result = flowHandler.handleStatus(flowChatId)
             assertContains(result, "@Alice: €60.00")
             assertContains(result, "@Bob: €30.00")
-            assertContains(result, "Total spent: €90.00")
+            assertContains(result, "Итого: €90.00")
 
             // 5. Calculate - per person is €30, so Charlie owes €30, Alice gets €30 back
             result = flowHandler.handleCalculate(flowChatId)
-            assertContains(result, "Total: €90.00")
-            assertContains(result, "Per person: €30.00")
-            assertContains(result, "Who owes money")
+            assertContains(result, "Итого: €90.00")
+            assertContains(result, "На каждого: €30.00")
+            assertContains(result, "Кто должен")
             assertContains(result, "@Charlie: €30.00")
-            assertContains(result, "Who should receive")
+            assertContains(result, "Кому вернуть")
             assertContains(result, "@Alice: €30.00")
 
             // 6. Notify - only Charlie should be reminded
             result = flowHandler.handleNotify(flowChatId)
-            assertContains(result, "Payment Reminder")
-            assertContains(result, "@Charlie please transfer €30.00")
+            assertContains(result, "Напоминание об оплате")
+            assertContains(result, "@Charlie, переведи €30.00")
         }
 
         @Test
         fun `addexpense auto-adds participant`() {
             // No participants yet
             var result = flowHandler.handleListParticipants(flowChatId)
-            assertContains(result, "No participants yet")
+            assertContains(result, "Участников пока нет")
 
             // Adding expense auto-adds the buyer as participant
             flowHandler.handleAddExpense(flowChatId, "/addexpense @Dave 25")
 
             result = flowHandler.handleListParticipants(flowChatId)
             assertContains(result, "@Dave")
-            assertContains(result, "Participants (1)")
+            assertContains(result, "Участники (1)")
         }
 
         @Test
@@ -491,7 +491,7 @@ class CommandHandlerTest {
             flowHandler.handleAddExpense(flowChatId, "/addexpense @Alice 40")
 
             val result = flowHandler.handleListParticipants(flowChatId)
-            assertContains(result, "Participants (1)")
+            assertContains(result, "Участники (1)")
         }
 
         @Test
@@ -500,7 +500,7 @@ class CommandHandlerTest {
             flowHandler.handleRemoveParticipant(flowChatId, "/removeparticipant @Alice")
 
             var result = flowHandler.handleListParticipants(flowChatId)
-            assertContains(result, "No participants yet")
+            assertContains(result, "Участников пока нет")
 
             flowHandler.handleAddParticipant(flowChatId, "/add @Alice")
             result = flowHandler.handleListParticipants(flowChatId)
@@ -515,24 +515,24 @@ class CommandHandlerTest {
             flowHandler.handleAddExpense(flowChatId, "/addexpense @Bob 50")
 
             val calcResult = flowHandler.handleCalculate(flowChatId)
-            assertContains(calcResult, "Everyone is settled up!")
+            assertContains(calcResult, "Все в расчёте!")
 
             val notifyResult = flowHandler.handleNotify(flowChatId)
-            assertContains(notifyResult, "No one owes money")
+            assertContains(notifyResult, "Все долги оплачены")
         }
 
         @Test
         fun `bulk add participants then calculate`() {
             val result = flowHandler.handleAddParticipant(flowChatId, "/add @Alice @Bob @Charlie")
-            assertContains(result, "Added: @Alice, @Bob, @Charlie")
+            assertContains(result, "Добавлены: @Alice, @Bob, @Charlie")
 
             val listResult = flowHandler.handleListParticipants(flowChatId)
-            assertContains(listResult, "Participants (3)")
+            assertContains(listResult, "Участники (3)")
 
             flowHandler.handleAddExpense(flowChatId, "/addexpense @Alice 90")
 
             val calcResult = flowHandler.handleCalculate(flowChatId)
-            assertContains(calcResult, "Per person: €30.00")
+            assertContains(calcResult, "На каждого: €30.00")
             assertContains(calcResult, "@Charlie: €30.00")
         }
 
@@ -543,20 +543,20 @@ class CommandHandlerTest {
 
             // Before paying: both Bob and Charlie owe
             var notifyResult = flowHandler.handleNotify(flowChatId)
-            assertContains(notifyResult, "@Bob please transfer €30.00")
-            assertContains(notifyResult, "@Charlie please transfer €30.00")
+            assertContains(notifyResult, "@Bob, переведи €30.00")
+            assertContains(notifyResult, "@Charlie, переведи €30.00")
 
             // Mark Bob as paid
             db.addPaidDebt(flowChatId, "@Bob", BigDecimal("30.00"))
 
             // After paying: only Charlie owes
             notifyResult = flowHandler.handleNotify(flowChatId)
-            assertContains(notifyResult, "@Charlie please transfer €30.00")
-            assertTrue { !notifyResult.contains("@Bob please transfer") }
+            assertContains(notifyResult, "@Charlie, переведи €30.00")
+            assertTrue { !notifyResult.contains("@Bob, переведи") }
 
             // Calculate shows Bob as paid
             val calcResult = flowHandler.handleCalculate(flowChatId)
-            assertContains(calcResult, "✅ @Bob: €30.00 (paid)")
+            assertContains(calcResult, "✅ @Bob: €30.00 (оплачено)")
 
             // getUnpaidDebts only returns Charlie
             val unpaid = flowHandler.getUnpaidDebts(flowChatId)
@@ -572,7 +572,7 @@ class CommandHandlerTest {
             db.addPaidDebt(flowChatId, "@Bob", BigDecimal("50.00"))
 
             val result = flowHandler.handleNotify(flowChatId)
-            assertContains(result, "No one owes money")
+            assertContains(result, "Все долги оплачены")
         }
 
         @Test
@@ -580,11 +580,11 @@ class CommandHandlerTest {
             flowHandler.handleAddParticipant(flowChatId, "/add @Alice")
 
             val result = flowHandler.handleAddParticipant(flowChatId, "/add @Alice @Bob @Charlie")
-            assertContains(result, "Added: @Bob, @Charlie")
-            assertContains(result, "Already existed: @Alice")
+            assertContains(result, "Добавлены: @Bob, @Charlie")
+            assertContains(result, "Уже были: @Alice")
 
             val listResult = flowHandler.handleListParticipants(flowChatId)
-            assertContains(listResult, "Participants (3)")
+            assertContains(listResult, "Участники (3)")
         }
 
         @Test
@@ -593,13 +593,13 @@ class CommandHandlerTest {
             flowHandler.handleAddExpense(flowChatId, "/addexpense @Alice 100")
 
             // Set payment info
-            val setResult = flowHandler.handleSetPayment(flowChatId, "/setpayment Phone: +31612345678")
-            assertContains(setResult, "Payment info saved")
+            val setResult = flowHandler.handleSetPayment(flowChatId, "/setpayment Телефон: +31612345678")
+            assertContains(setResult, "Реквизиты сохранены")
 
             // Notify should include payment details
             val notifyResult = flowHandler.handleNotify(flowChatId)
-            assertContains(notifyResult, "@Bob please transfer €50.00")
-            assertContains(notifyResult, "Phone: +31612345678")
+            assertContains(notifyResult, "@Bob, переведи €50.00")
+            assertContains(notifyResult, "Телефон: +31612345678")
         }
     }
 }
