@@ -129,7 +129,10 @@ class BirthdayBot(
                 sendParticipantList(chatId)
                 null
             }
-            text == "/calculate" -> commandHandler.handleCalculate(chatId)
+            text == "/calculate" -> {
+                sendCalculateWithButtons(chatId)
+                null
+            }
             text == "/status" -> commandHandler.handleStatus(chatId)
             text == "/notify" -> commandHandler.handleNotify(chatId)
             text == "/reset" -> {
@@ -156,6 +159,7 @@ class BirthdayBot(
             data == "reset_confirm" -> {
                 database.clearExpenses(chatId)
                 database.clearParticipants(chatId)
+                database.clearPaidDebts(chatId)
                 editMessage(chatId, messageId, "🔄 All expenses and participants cleared! Ready for a new event.")
             }
             data == "reset_cancel" -> {
@@ -165,7 +169,7 @@ class BirthdayBot(
             data == "menu_participants" -> sendParticipantList(chatId)
             data == "menu_addexpense" -> sendExpensePicker(chatId)
             data == "menu_status" -> sendMessage(chatId, commandHandler.handleStatus(chatId))
-            data == "menu_calculate" -> sendMessage(chatId, commandHandler.handleCalculate(chatId))
+            data == "menu_calculate" -> sendCalculateWithButtons(chatId)
             data == "menu_notify" -> sendMessage(chatId, commandHandler.handleNotify(chatId))
             data == "menu_reset" -> handleResetWithConfirmation(chatId)
             // Participant list callbacks
@@ -182,6 +186,14 @@ class BirthdayBot(
                 val name = data.removePrefix("expense_pick:")
                 pendingExpense[chatId] = name
                 editMessage(chatId, messageId, "💰 Adding expense for *$name*. Send the amount:")
+            }
+            // Mark debt as paid callbacks
+            data.startsWith("mark_paid:") -> {
+                val parts = data.removePrefix("mark_paid:").split(":")
+                val name = parts[0]
+                val amount = parts[1].toBigDecimalOrNull() ?: BigDecimal.ZERO
+                database.addPaidDebt(chatId, name, amount)
+                editCalculateWithButtons(chatId, messageId)
             }
         }
     }
@@ -278,6 +290,46 @@ class BirthdayBot(
         keyboard.keyboard = rows
 
         sendMessageWithKeyboard(chatId, "Who paid?", keyboard)
+    }
+
+    private fun sendCalculateWithButtons(chatId: Long) {
+        val text = commandHandler.handleCalculate(chatId)
+        val unpaidDebts = commandHandler.getUnpaidDebts(chatId)
+
+        if (unpaidDebts.isEmpty()) {
+            sendMessage(chatId, text)
+            return
+        }
+
+        val keyboard = InlineKeyboardMarkup()
+        keyboard.keyboard = unpaidDebts.map { (name, amount) ->
+            val formatted = amount.setScale(2, RoundingMode.HALF_UP)
+            listOf(InlineKeyboardButton("✅ Mark $name (€$formatted) as paid").apply {
+                callbackData = "mark_paid:$name:$formatted"
+            })
+        }
+
+        sendMessageWithKeyboard(chatId, text, keyboard)
+    }
+
+    private fun editCalculateWithButtons(chatId: Long, messageId: Int) {
+        val text = commandHandler.handleCalculate(chatId)
+        val unpaidDebts = commandHandler.getUnpaidDebts(chatId)
+
+        if (unpaidDebts.isEmpty()) {
+            editMessage(chatId, messageId, text)
+            return
+        }
+
+        val keyboard = InlineKeyboardMarkup()
+        keyboard.keyboard = unpaidDebts.map { (name, amount) ->
+            val formatted = amount.setScale(2, RoundingMode.HALF_UP)
+            listOf(InlineKeyboardButton("✅ Mark $name (€$formatted) as paid").apply {
+                callbackData = "mark_paid:$name:$formatted"
+            })
+        }
+
+        editMessageWithKeyboard(chatId, messageId, text, keyboard)
     }
 
     private fun handleResetWithConfirmation(chatId: Long) {

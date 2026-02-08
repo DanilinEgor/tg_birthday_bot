@@ -196,6 +196,7 @@ class CommandHandlerTest {
             Participant(2, CHAT_ID, "Bob"),
             Participant(3, CHAT_ID, "Charlie")
         )
+        every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleCalculate(CHAT_ID)
         assertContains(result, "Total: €90.00")
@@ -234,9 +235,27 @@ class CommandHandlerTest {
             Participant(1, CHAT_ID, "Alice"),
             Participant(2, CHAT_ID, "Bob")
         )
+        every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleCalculate(CHAT_ID)
         assertContains(result, "Everyone is settled up!")
+    }
+
+    @Test
+    fun `calculate shows paid marker for paid debts`() {
+        every { database.getExpenses(CHAT_ID) } returns listOf(
+            Expense(1, CHAT_ID, "Alice", BigDecimal("90.00"))
+        )
+        every { database.getParticipants(CHAT_ID) } returns listOf(
+            Participant(1, CHAT_ID, "Alice"),
+            Participant(2, CHAT_ID, "Bob"),
+            Participant(3, CHAT_ID, "Charlie")
+        )
+        every { database.getPaidDebts(CHAT_ID) } returns mapOf("Bob" to BigDecimal("30.00"))
+
+        val result = handler.handleCalculate(CHAT_ID)
+        assertContains(result, "✅ Bob: €30.00 (paid)")
+        assertContains(result, "Charlie: €30.00")
     }
 
     // --- /notify ---
@@ -251,6 +270,7 @@ class CommandHandlerTest {
             Participant(2, CHAT_ID, "Bob"),
             Participant(3, CHAT_ID, "Charlie")
         )
+        every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
 
         val result = handler.handleNotify(CHAT_ID)
         assertContains(result, "Payment Reminder")
@@ -286,6 +306,45 @@ class CommandHandlerTest {
             Participant(1, CHAT_ID, "Alice"),
             Participant(2, CHAT_ID, "Bob")
         )
+        every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
+
+        val result = handler.handleNotify(CHAT_ID)
+        assertContains(result, "No one owes money")
+    }
+
+    @Test
+    fun `notify skips paid debts`() {
+        every { database.getExpenses(CHAT_ID) } returns listOf(
+            Expense(1, CHAT_ID, "Alice", BigDecimal("90.00"))
+        )
+        every { database.getParticipants(CHAT_ID) } returns listOf(
+            Participant(1, CHAT_ID, "Alice"),
+            Participant(2, CHAT_ID, "Bob"),
+            Participant(3, CHAT_ID, "Charlie")
+        )
+        // Bob paid his €30 debt
+        every { database.getPaidDebts(CHAT_ID) } returns mapOf("Bob" to BigDecimal("30.00"))
+
+        val result = handler.handleNotify(CHAT_ID)
+        assertContains(result, "Payment Reminder")
+        assertContains(result, "Charlie please transfer")
+        assertTrue { !result.contains("Bob please transfer") }
+    }
+
+    @Test
+    fun `notify returns settled when all debts paid`() {
+        every { database.getExpenses(CHAT_ID) } returns listOf(
+            Expense(1, CHAT_ID, "Alice", BigDecimal("90.00"))
+        )
+        every { database.getParticipants(CHAT_ID) } returns listOf(
+            Participant(1, CHAT_ID, "Alice"),
+            Participant(2, CHAT_ID, "Bob"),
+            Participant(3, CHAT_ID, "Charlie")
+        )
+        every { database.getPaidDebts(CHAT_ID) } returns mapOf(
+            "Bob" to BigDecimal("30.00"),
+            "Charlie" to BigDecimal("30.00")
+        )
 
         val result = handler.handleNotify(CHAT_ID)
         assertContains(result, "No one owes money")
@@ -318,6 +377,7 @@ class CommandHandlerTest {
             db.initialize()
             db.clearExpenses(flowChatId)
             db.clearParticipants(flowChatId)
+            db.clearPaidDebts(flowChatId)
             flowHandler = CommandHandler(db)
         }
 
@@ -433,6 +493,45 @@ class CommandHandlerTest {
             val calcResult = flowHandler.handleCalculate(flowChatId)
             assertContains(calcResult, "Per person: €30.00")
             assertContains(calcResult, "Charlie: €30.00")
+        }
+
+        @Test
+        fun `mark debt as paid removes from notify`() {
+            flowHandler.handleAddParticipant(flowChatId, "/addparticipant Alice Bob Charlie")
+            flowHandler.handleAddExpense(flowChatId, "/addexpense Alice 90")
+
+            // Before paying: both Bob and Charlie owe
+            var notifyResult = flowHandler.handleNotify(flowChatId)
+            assertContains(notifyResult, "Bob please transfer €30.00")
+            assertContains(notifyResult, "Charlie please transfer €30.00")
+
+            // Mark Bob as paid
+            db.addPaidDebt(flowChatId, "Bob", BigDecimal("30.00"))
+
+            // After paying: only Charlie owes
+            notifyResult = flowHandler.handleNotify(flowChatId)
+            assertContains(notifyResult, "Charlie please transfer €30.00")
+            assertTrue { !notifyResult.contains("Bob please transfer") }
+
+            // Calculate shows Bob as paid
+            val calcResult = flowHandler.handleCalculate(flowChatId)
+            assertContains(calcResult, "✅ Bob: €30.00 (paid)")
+
+            // getUnpaidDebts only returns Charlie
+            val unpaid = flowHandler.getUnpaidDebts(flowChatId)
+            assertEquals(1, unpaid.size)
+            assertTrue { "Charlie" in unpaid }
+        }
+
+        @Test
+        fun `all debts paid results in settled notify`() {
+            flowHandler.handleAddParticipant(flowChatId, "/addparticipant Alice Bob")
+            flowHandler.handleAddExpense(flowChatId, "/addexpense Alice 100")
+
+            db.addPaidDebt(flowChatId, "Bob", BigDecimal("50.00"))
+
+            val result = flowHandler.handleNotify(flowChatId)
+            assertContains(result, "No one owes money")
         }
 
         @Test

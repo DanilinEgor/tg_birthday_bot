@@ -111,6 +111,29 @@ class CommandHandler(private val database: DatabaseOperations) {
         return status
     }
 
+    fun getUnpaidDebts(chatId: Long): Map<String, BigDecimal> {
+        val expenses = database.getExpenses(chatId)
+        val participants = database.getParticipants(chatId)
+        if (expenses.isEmpty() || participants.isEmpty()) return emptyMap()
+
+        val total = expenses.sumOf { it.amount }
+        val perPerson = total.divide(BigDecimal(participants.size), 2, RoundingMode.HALF_UP)
+
+        val spent = mutableMapOf<String, BigDecimal>()
+        participants.forEach { spent[it.name] = BigDecimal.ZERO }
+        expenses.forEach { expense ->
+            spent[expense.buyerName] = (spent[expense.buyerName] ?: BigDecimal.ZERO) + expense.amount
+        }
+
+        val balances = spent.mapValues { (_, spentAmount) -> spentAmount - perPerson }
+        val paidAmounts = database.getPaidDebts(chatId)
+
+        return balances
+            .mapValues { (name, balance) -> balance + (paidAmounts[name] ?: BigDecimal.ZERO) }
+            .filter { it.value < BigDecimal.ZERO }
+            .mapValues { it.value.abs() }
+    }
+
     fun handleCalculate(chatId: Long): String {
         val expenses = database.getExpenses(chatId)
         val participants = database.getParticipants(chatId)
@@ -135,7 +158,11 @@ class CommandHandler(private val database: DatabaseOperations) {
         }
 
         // Calculate balances (positive = should receive, negative = should pay)
-        val balances = spent.mapValues { (_, spentAmount) -> spentAmount - perPerson }
+        val rawBalances = spent.mapValues { (_, spentAmount) -> spentAmount - perPerson }
+        val paidAmounts = database.getPaidDebts(chatId)
+        val adjustedBalances = rawBalances.mapValues { (name, balance) ->
+            balance + (paidAmounts[name] ?: BigDecimal.ZERO)
+        }
 
         val result = buildString {
             appendLine("💵 Payment Calculation:")
@@ -145,15 +172,20 @@ class CommandHandler(private val database: DatabaseOperations) {
             appendLine("Per person: €${perPerson.setScale(2, RoundingMode.HALF_UP)}")
             appendLine()
 
-            val owes = balances.filter { it.value < BigDecimal.ZERO }
-            val receives = balances.filter { it.value > BigDecimal.ZERO }
+            val rawOwes = rawBalances.filter { it.value < BigDecimal.ZERO }
+            val receives = rawBalances.filter { it.value > BigDecimal.ZERO }
 
-            if (owes.isEmpty()) {
+            if (rawOwes.isEmpty()) {
                 appendLine("✅ Everyone is settled up!")
             } else {
                 appendLine("💸 Who owes money:")
-                owes.forEach { (name, amount) ->
-                    appendLine("   ${name}: €${amount.abs().setScale(2, RoundingMode.HALF_UP)}")
+                rawOwes.forEach { (name, amount) ->
+                    val adjusted = adjustedBalances[name] ?: amount
+                    if (adjusted >= BigDecimal.ZERO) {
+                        appendLine("   ✅ ${name}: €${amount.abs().setScale(2, RoundingMode.HALF_UP)} (paid)")
+                    } else {
+                        appendLine("   ${name}: €${adjusted.abs().setScale(2, RoundingMode.HALF_UP)}")
+                    }
                 }
                 appendLine()
                 appendLine("💰 Who should receive:")
@@ -178,28 +210,17 @@ class CommandHandler(private val database: DatabaseOperations) {
             return "❌ No participants added. Add participants with /addparticipant"
         }
 
-        val total = expenses.sumOf { it.amount }
-        val peopleCount = participants.size
-        val perPerson = total.divide(BigDecimal(peopleCount), 2, RoundingMode.HALF_UP)
+        val unpaidDebts = getUnpaidDebts(chatId)
 
-        val spent = mutableMapOf<String, BigDecimal>()
-        participants.forEach { spent[it.name] = BigDecimal.ZERO }
-        expenses.forEach { expense ->
-            spent[expense.buyerName] = (spent[expense.buyerName] ?: BigDecimal.ZERO) + expense.amount
-        }
-
-        val balances = spent.mapValues { (_, spentAmount) -> spentAmount - perPerson }
-        val owes = balances.filter { it.value < BigDecimal.ZERO }
-
-        if (owes.isEmpty()) {
+        if (unpaidDebts.isEmpty()) {
             return "✅ No one owes money!"
         }
 
         val notification = buildString {
             appendLine("🔔 Payment Reminder!")
             appendLine()
-            owes.forEach { (name, amount) ->
-                appendLine("${name} please transfer €${amount.abs().setScale(2, RoundingMode.HALF_UP)}")
+            unpaidDebts.forEach { (name, amount) ->
+                appendLine("${name} please transfer €${amount.setScale(2, RoundingMode.HALF_UP)}")
             }
             appendLine()
             appendLine("Use /calculate to see full breakdown")

@@ -12,6 +12,9 @@ interface DatabaseOperations {
     fun getParticipants(chatId: Long): List<Participant>
     fun clearParticipants(chatId: Long)
     fun getActiveChatIds(): List<Long>
+    fun addPaidDebt(chatId: Long, payerName: String, amount: BigDecimal)
+    fun getPaidDebts(chatId: Long): Map<String, BigDecimal>
+    fun clearPaidDebts(chatId: Long)
 }
 
 class Database(private val dbUrl: String, private val user: String, private val password: String) : DatabaseOperations {
@@ -39,6 +42,16 @@ class Database(private val dbUrl: String, private val user: String, private val 
                     name VARCHAR(255) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(chat_id, name)
+                )
+            """)
+
+            conn.createStatement().execute("""
+                CREATE TABLE IF NOT EXISTS paid_debts (
+                    id SERIAL PRIMARY KEY,
+                    chat_id BIGINT NOT NULL,
+                    payer_name VARCHAR(255) NOT NULL,
+                    amount DECIMAL(10, 2) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
         }
@@ -141,6 +154,41 @@ class Database(private val dbUrl: String, private val user: String, private val 
     override fun clearParticipants(chatId: Long) {
         getConnection().use { conn ->
             val stmt = conn.prepareStatement("DELETE FROM participants WHERE chat_id = ?")
+            stmt.setLong(1, chatId)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun addPaidDebt(chatId: Long, payerName: String, amount: BigDecimal) {
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement(
+                "INSERT INTO paid_debts (chat_id, payer_name, amount) VALUES (?, ?, ?)"
+            )
+            stmt.setLong(1, chatId)
+            stmt.setString(2, payerName)
+            stmt.setBigDecimal(3, amount)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun getPaidDebts(chatId: Long): Map<String, BigDecimal> {
+        val paid = mutableMapOf<String, BigDecimal>()
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement(
+                "SELECT payer_name, SUM(amount) as total FROM paid_debts WHERE chat_id = ? GROUP BY payer_name"
+            )
+            stmt.setLong(1, chatId)
+            val rs = stmt.executeQuery()
+            while (rs.next()) {
+                paid[rs.getString("payer_name")] = rs.getBigDecimal("total")
+            }
+        }
+        return paid
+    }
+
+    override fun clearPaidDebts(chatId: Long) {
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement("DELETE FROM paid_debts WHERE chat_id = ?")
             stmt.setLong(1, chatId)
             stmt.executeUpdate()
         }
