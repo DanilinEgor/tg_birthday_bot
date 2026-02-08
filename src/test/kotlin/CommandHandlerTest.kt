@@ -93,6 +93,27 @@ class CommandHandlerTest {
         assertContains(result, "Usage: /addparticipant")
     }
 
+    @Test
+    fun `addParticipant bulk add returns summary`() {
+        every { database.addParticipant(CHAT_ID, "Alice") } returns Participant(1, CHAT_ID, "Alice")
+        every { database.addParticipant(CHAT_ID, "Bob") } returns Participant(2, CHAT_ID, "Bob")
+        every { database.addParticipant(CHAT_ID, "Charlie") } returns Participant(3, CHAT_ID, "Charlie")
+
+        val result = handler.handleAddParticipant(CHAT_ID, "/addparticipant Alice Bob Charlie")
+        assertContains(result, "Added: Alice, Bob, Charlie")
+    }
+
+    @Test
+    fun `addParticipant bulk with some duplicates returns mixed summary`() {
+        every { database.addParticipant(CHAT_ID, "Alice") } returns Participant(1, CHAT_ID, "Alice")
+        every { database.addParticipant(CHAT_ID, "Bob") } returns null
+        every { database.addParticipant(CHAT_ID, "Charlie") } returns Participant(3, CHAT_ID, "Charlie")
+
+        val result = handler.handleAddParticipant(CHAT_ID, "/addparticipant Alice Bob Charlie")
+        assertContains(result, "Added: Alice, Charlie")
+        assertContains(result, "Already existed: Bob")
+    }
+
     // --- /removeparticipant ---
 
     @Test
@@ -280,7 +301,6 @@ class CommandHandlerTest {
         assertContains(result, "/addparticipant")
         assertContains(result, "/calculate")
         assertContains(result, "/reset")
-        assertContains(result, "/help")
     }
 
     // --- Usage flow tests (real H2 database) ---
@@ -398,6 +418,33 @@ class CommandHandlerTest {
 
             val notifyResult = flowHandler.handleNotify(flowChatId)
             assertContains(notifyResult, "No one owes money")
+        }
+
+        @Test
+        fun `bulk add participants then calculate`() {
+            val result = flowHandler.handleAddParticipant(flowChatId, "/addparticipant Alice Bob Charlie")
+            assertContains(result, "Added: Alice, Bob, Charlie")
+
+            val listResult = flowHandler.handleListParticipants(flowChatId)
+            assertContains(listResult, "Participants (3)")
+
+            flowHandler.handleAddExpense(flowChatId, "/addexpense Alice 90")
+
+            val calcResult = flowHandler.handleCalculate(flowChatId)
+            assertContains(calcResult, "Per person: €30.00")
+            assertContains(calcResult, "Charlie: €30.00")
+        }
+
+        @Test
+        fun `bulk add with duplicates returns mixed summary`() {
+            flowHandler.handleAddParticipant(flowChatId, "/addparticipant Alice")
+
+            val result = flowHandler.handleAddParticipant(flowChatId, "/addparticipant Alice Bob Charlie")
+            assertContains(result, "Added: Bob, Charlie")
+            assertContains(result, "Already existed: Alice")
+
+            val listResult = flowHandler.handleListParticipants(flowChatId)
+            assertContains(listResult, "Participants (3)")
         }
     }
 }

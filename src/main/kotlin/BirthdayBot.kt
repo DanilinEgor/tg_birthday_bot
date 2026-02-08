@@ -8,6 +8,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.concurrent.ConcurrentHashMap
 
 class BirthdayBot(
     private val botToken: String,
@@ -15,6 +18,8 @@ class BirthdayBot(
     private val database: Database,
     private val commandHandler: CommandHandler
 ) : TelegramLongPollingBot() {
+
+    private val pendingExpense = ConcurrentHashMap<Long, String>()
 
     init {
         setupCommands()
@@ -28,7 +33,7 @@ class BirthdayBot(
             val commands = listOf(
                 BotCommand("start", "Show welcome message"),
                 BotCommand("addexpense", "Add an expense (name amount)"),
-                BotCommand("addparticipant", "Add a participant (name)"),
+                BotCommand("addparticipant", "Add participants (name1 name2 ...)"),
                 BotCommand("removeparticipant", "Remove a participant (name)"),
                 BotCommand("participants", "List all participants"),
                 BotCommand("status", "View all expenses"),
@@ -55,16 +60,44 @@ class BirthdayBot(
         val chatId = message.chatId
         val text = message.text
 
+        // Check for pending expense amount
+        val pendingName = pendingExpense[chatId]
+        if (pendingName != null && !text.startsWith("/")) {
+            val amount = text.trim().toBigDecimalOrNull()
+            if (amount != null && amount > BigDecimal.ZERO) {
+                database.addExpense(chatId, pendingName, amount)
+                database.addParticipant(chatId, pendingName)
+                pendingExpense.remove(chatId)
+                sendMessage(chatId, "✅ Added expense: $pendingName spent €${amount.setScale(2, RoundingMode.HALF_UP)}")
+            } else {
+                sendMessage(chatId, "❌ Please send a valid positive number for the amount.")
+            }
+            return
+        }
+
         val response = when {
-            text.startsWith("/addexpense") -> commandHandler.handleAddExpense(chatId, text)
+            text == "/addexpense" -> {
+                sendExpensePicker(chatId)
+                null
+            }
+            text.startsWith("/addexpense ") -> commandHandler.handleAddExpense(chatId, text)
             text.startsWith("/addparticipant") -> commandHandler.handleAddParticipant(chatId, text)
             text.startsWith("/removeparticipant") -> commandHandler.handleRemoveParticipant(chatId, text)
-            text == "/participants" -> commandHandler.handleListParticipants(chatId)
+            text == "/participants" -> {
+                sendParticipantList(chatId)
+                null
+            }
             text == "/calculate" -> commandHandler.handleCalculate(chatId)
             text == "/status" -> commandHandler.handleStatus(chatId)
             text == "/notify" -> commandHandler.handleNotify(chatId)
-            text == "/reset" -> handleResetWithConfirmation(chatId)
-            text == "/help" || text == "/start" -> commandHandler.getHelpMessage()
+            text == "/reset" -> {
+                handleResetWithConfirmation(chatId)
+                null
+            }
+            text == "/help" || text == "/start" -> {
+                sendMainMenu(chatId)
+                null
+            }
             else -> null
         }
 
@@ -77,19 +110,135 @@ class BirthdayBot(
         val messageId = callbackQuery.message.messageId
         val data = callbackQuery.data
 
-        when (data) {
-            "reset_confirm" -> {
+        when {
+            data == "reset_confirm" -> {
                 database.clearExpenses(chatId)
                 database.clearParticipants(chatId)
                 editMessage(chatId, messageId, "🔄 All expenses and participants cleared! Ready for a new event.")
             }
-            "reset_cancel" -> {
+            data == "reset_cancel" -> {
                 editMessage(chatId, messageId, "❌ Reset cancelled. Your data is safe.")
+            }
+            // Main menu callbacks
+            data == "menu_participants" -> sendParticipantList(chatId)
+            data == "menu_addexpense" -> sendExpensePicker(chatId)
+            data == "menu_status" -> sendMessage(chatId, commandHandler.handleStatus(chatId))
+            data == "menu_calculate" -> sendMessage(chatId, commandHandler.handleCalculate(chatId))
+            data == "menu_notify" -> sendMessage(chatId, commandHandler.handleNotify(chatId))
+            data == "menu_reset" -> handleResetWithConfirmation(chatId)
+            // Participant list callbacks
+            data.startsWith("rm_part:") -> {
+                val name = data.removePrefix("rm_part:")
+                database.removeParticipant(chatId, name)
+                editParticipantList(chatId, messageId)
+            }
+            data == "add_part_hint" -> {
+                sendMessage(chatId, "Send participant names:\n/addparticipant Alice Bob Charlie")
+            }
+            // Expense picker callbacks
+            data.startsWith("expense_pick:") -> {
+                val name = data.removePrefix("expense_pick:")
+                pendingExpense[chatId] = name
+                editMessage(chatId, messageId, "💰 Adding expense for *$name*. Send the amount:")
             }
         }
     }
 
-    private fun handleResetWithConfirmation(chatId: Long): String {
+    private fun sendMainMenu(chatId: Long) {
+        val keyboard = InlineKeyboardMarkup()
+        keyboard.keyboard = listOf(
+            listOf(
+                InlineKeyboardButton("👥 Participants").apply { callbackData = "menu_participants" },
+                InlineKeyboardButton("💰 Add Expense").apply { callbackData = "menu_addexpense" }
+            ),
+            listOf(
+                InlineKeyboardButton("📊 Status").apply { callbackData = "menu_status" },
+                InlineKeyboardButton("💵 Calculate").apply { callbackData = "menu_calculate" }
+            ),
+            listOf(
+                InlineKeyboardButton("🔔 Notify").apply { callbackData = "menu_notify" },
+                InlineKeyboardButton("🔄 Reset").apply { callbackData = "menu_reset" }
+            )
+        )
+        sendMessageWithKeyboard(chatId, commandHandler.getHelpMessage(), keyboard)
+    }
+
+    private fun sendParticipantList(chatId: Long) {
+        val participants = database.getParticipants(chatId)
+
+        if (participants.isEmpty()) {
+            sendMessage(chatId, "No participants yet. Use /addparticipant Name1 Name2 to add people.")
+            return
+        }
+
+        val text = buildString {
+            appendLine("👥 Participants (${participants.size}):")
+            participants.forEach { appendLine("• ${it.name}") }
+        }
+
+        val keyboard = InlineKeyboardMarkup()
+        val rows = mutableListOf<List<InlineKeyboardButton>>()
+        participants.chunked(2).forEach { chunk ->
+            rows.add(chunk.map { p ->
+                InlineKeyboardButton("❌ ${p.name}").apply { callbackData = "rm_part:${p.name}" }
+            })
+        }
+        rows.add(listOf(
+            InlineKeyboardButton("➕ Add Participant").apply { callbackData = "add_part_hint" }
+        ))
+        keyboard.keyboard = rows
+
+        sendMessageWithKeyboard(chatId, text, keyboard)
+    }
+
+    private fun editParticipantList(chatId: Long, messageId: Int) {
+        val participants = database.getParticipants(chatId)
+
+        if (participants.isEmpty()) {
+            editMessage(chatId, messageId, "👥 No participants left. Use /addparticipant Name1 Name2 to add people.")
+            return
+        }
+
+        val text = buildString {
+            appendLine("👥 Participants (${participants.size}):")
+            participants.forEach { appendLine("• ${it.name}") }
+        }
+
+        val keyboard = InlineKeyboardMarkup()
+        val rows = mutableListOf<List<InlineKeyboardButton>>()
+        participants.chunked(2).forEach { chunk ->
+            rows.add(chunk.map { p ->
+                InlineKeyboardButton("❌ ${p.name}").apply { callbackData = "rm_part:${p.name}" }
+            })
+        }
+        rows.add(listOf(
+            InlineKeyboardButton("➕ Add Participant").apply { callbackData = "add_part_hint" }
+        ))
+        keyboard.keyboard = rows
+
+        editMessageWithKeyboard(chatId, messageId, text, keyboard)
+    }
+
+    private fun sendExpensePicker(chatId: Long) {
+        val participants = database.getParticipants(chatId)
+
+        if (participants.isEmpty()) {
+            sendMessage(chatId, "No participants yet. Add some first with /addparticipant")
+            return
+        }
+
+        val keyboard = InlineKeyboardMarkup()
+        val rows = participants.chunked(2).map { chunk ->
+            chunk.map { p ->
+                InlineKeyboardButton(p.name).apply { callbackData = "expense_pick:${p.name}" }
+            }
+        }
+        keyboard.keyboard = rows
+
+        sendMessageWithKeyboard(chatId, "Who paid?", keyboard)
+    }
+
+    private fun handleResetWithConfirmation(chatId: Long) {
         val keyboard = InlineKeyboardMarkup()
         val row = listOf(
             InlineKeyboardButton("✅ Yes, clear all").apply { callbackData = "reset_confirm" },
@@ -97,13 +246,7 @@ class BirthdayBot(
         )
         keyboard.keyboard = listOf(row)
 
-        val message = SendMessage()
-        message.chatId = chatId.toString()
-        message.text = "⚠️ Are you sure you want to clear all expenses and participants for this chat?"
-        message.replyMarkup = keyboard
-        execute(message)
-
-        return ""
+        sendMessageWithKeyboard(chatId, "⚠️ Are you sure you want to clear all expenses and participants for this chat?", keyboard)
     }
 
     private fun sendMessage(chatId: Long, text: String) {
@@ -114,11 +257,28 @@ class BirthdayBot(
         execute(message)
     }
 
+    private fun sendMessageWithKeyboard(chatId: Long, text: String, keyboard: InlineKeyboardMarkup) {
+        val message = SendMessage()
+        message.chatId = chatId.toString()
+        message.text = text
+        message.replyMarkup = keyboard
+        execute(message)
+    }
+
     private fun editMessage(chatId: Long, messageId: Int, text: String) {
         val editMessage = EditMessageText()
         editMessage.chatId = chatId.toString()
         editMessage.messageId = messageId
         editMessage.text = text
+        execute(editMessage)
+    }
+
+    private fun editMessageWithKeyboard(chatId: Long, messageId: Int, text: String, keyboard: InlineKeyboardMarkup) {
+        val editMessage = EditMessageText()
+        editMessage.chatId = chatId.toString()
+        editMessage.messageId = messageId
+        editMessage.text = text
+        editMessage.replyMarkup = keyboard
         execute(editMessage)
     }
 }

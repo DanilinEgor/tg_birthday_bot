@@ -27,16 +27,34 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleAddParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /addparticipant [name]\nExample: /addparticipant Alice"
+            return "❌ Usage: /addparticipant [name1] [name2] ...\nExample: /addparticipant Alice Bob Charlie"
         }
 
-        val name = parts[1]
-        val participant = database.addParticipant(chatId, name)
+        val names = parts.drop(1)
+        if (names.size == 1) {
+            val name = names[0]
+            val participant = database.addParticipant(chatId, name)
+            return if (participant != null) {
+                "✅ Added $name to participants list"
+            } else {
+                "⚠️ $name is already in the participants list"
+            }
+        }
 
-        return if (participant != null) {
-            "✅ Added $name to participants list"
-        } else {
-            "⚠️ $name is already in the participants list"
+        val added = mutableListOf<String>()
+        val existed = mutableListOf<String>()
+        for (name in names) {
+            if (database.addParticipant(chatId, name) != null) {
+                added.add(name)
+            } else {
+                existed.add(name)
+            }
+        }
+
+        return buildString {
+            if (added.isNotEmpty()) append("✅ Added: ${added.joinToString(", ")}")
+            if (added.isNotEmpty() && existed.isNotEmpty()) append("\n")
+            if (existed.isNotEmpty()) append("⚠️ Already existed: ${existed.joinToString(", ")}")
         }
     }
 
@@ -194,30 +212,15 @@ class CommandHandler(private val database: DatabaseOperations) {
         return """
             🎉 Birthday Gift Bot
 
-            Participant Commands:
-            /addparticipant [name] - Add someone to the group
-            /removeparticipant [name] - Remove someone
-            /participants - List all participants
-
-            Expense Commands:
+            /addparticipant [names] - Add people (e.g. Alice Bob Charlie)
             /addexpense [name] [amount] - Record an expense
+            /participants - List all participants
             /status - View all expenses
             /calculate - Calculate who owes what
             /notify - Send payment reminders
-
-            Other:
             /reset - Clear all data
-            /help - Show this message
 
-            Example workflow:
-            1. /addparticipant Alice
-            2. /addparticipant Bob
-            3. /addparticipant Charlie
-            4. /addexpense Alice 60
-            5. /addexpense Bob 40
-            6. /calculate
-
-            💡 This bot works independently in each group!
+            💡 Use the buttons below or type commands!
         """.trimIndent()
     }
 }
