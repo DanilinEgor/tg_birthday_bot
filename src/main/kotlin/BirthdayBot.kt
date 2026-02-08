@@ -101,7 +101,7 @@ class BirthdayBot(
 
         val message = update.message
         val chatId = message.chatId
-        val text = message.text
+        val text = message.text.replace("@$botUsername", "")
 
         // Check for pending expense amount
         val pendingName = pendingExpense[chatId]
