@@ -206,7 +206,7 @@ class Database(private val dbUrl: String, private val user: String, private val 
     override fun setPaymentInfo(chatId: Long, info: String) {
         getConnection().use { conn ->
             val stmt = conn.prepareStatement(
-                "MERGE INTO chat_settings (chat_id, payment_info) VALUES (?, ?)"
+                "INSERT INTO chat_settings (chat_id, payment_info) VALUES (?, ?) ON CONFLICT (chat_id) DO UPDATE SET payment_info = EXCLUDED.payment_info"
             )
             stmt.setLong(1, chatId)
             stmt.setString(2, info)
