@@ -187,7 +187,7 @@ class BirthdayBot(
             data.startsWith("expense_pick:") -> {
                 val name = data.removePrefix("expense_pick:")
                 pendingExpense[chatId] = name
-                editMessage(chatId, messageId, "💰 Добавляю расход для *$name*. Отправь сумму:")
+                editMessage(chatId, messageId, "💰 Добавляю расход для *$name*. Отправь ответом на это сообщение сумму:")
             }
             // Mark debt as paid callbacks
             data.startsWith("mark_paid:") -> {
@@ -306,7 +306,7 @@ class BirthdayBot(
         val keyboard = InlineKeyboardMarkup()
         keyboard.keyboard = unpaidDebts.map { (name, amount) ->
             val formatted = amount.setScale(2, RoundingMode.HALF_UP)
-            listOf(InlineKeyboardButton("✅ $name (€$formatted) оплачено").apply {
+            listOf(InlineKeyboardButton("✅ Отметить $name (€$formatted) оплаченным").apply {
                 callbackData = "mark_paid:$name:$formatted"
             })
         }
@@ -326,7 +326,7 @@ class BirthdayBot(
         val keyboard = InlineKeyboardMarkup()
         keyboard.keyboard = unpaidDebts.map { (name, amount) ->
             val formatted = amount.setScale(2, RoundingMode.HALF_UP)
-            listOf(InlineKeyboardButton("✅ $name (€$formatted) оплачено").apply {
+            listOf(InlineKeyboardButton("✅ Отметить $name (€$formatted) оплаченным").apply {
                 callbackData = "mark_paid:$name:$formatted"
             })
         }
