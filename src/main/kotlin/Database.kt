@@ -15,6 +15,8 @@ interface DatabaseOperations {
     fun addPaidDebt(chatId: Long, payerName: String, amount: BigDecimal)
     fun getPaidDebts(chatId: Long): Map<String, BigDecimal>
     fun clearPaidDebts(chatId: Long)
+    fun setPaymentInfo(chatId: Long, info: String)
+    fun getPaymentInfo(chatId: Long): String?
 }
 
 class Database(private val dbUrl: String, private val user: String, private val password: String) : DatabaseOperations {
@@ -52,6 +54,13 @@ class Database(private val dbUrl: String, private val user: String, private val 
                     payer_name VARCHAR(255) NOT NULL,
                     amount DECIMAL(10, 2) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.createStatement().execute("""
+                CREATE TABLE IF NOT EXISTS chat_settings (
+                    chat_id BIGINT PRIMARY KEY,
+                    payment_info TEXT
                 )
             """)
         }
@@ -191,6 +200,26 @@ class Database(private val dbUrl: String, private val user: String, private val 
             val stmt = conn.prepareStatement("DELETE FROM paid_debts WHERE chat_id = ?")
             stmt.setLong(1, chatId)
             stmt.executeUpdate()
+        }
+    }
+
+    override fun setPaymentInfo(chatId: Long, info: String) {
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement(
+                "MERGE INTO chat_settings (chat_id, payment_info) VALUES (?, ?)"
+            )
+            stmt.setLong(1, chatId)
+            stmt.setString(2, info)
+            stmt.executeUpdate()
+        }
+    }
+
+    override fun getPaymentInfo(chatId: Long): String? {
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement("SELECT payment_info FROM chat_settings WHERE chat_id = ?")
+            stmt.setLong(1, chatId)
+            val rs = stmt.executeQuery()
+            return if (rs.next()) rs.getString("payment_info") else null
         }
     }
 

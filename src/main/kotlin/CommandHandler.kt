@@ -27,7 +27,7 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleAddParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /addparticipant [name1] [name2] ...\nExample: /addparticipant Alice Bob Charlie"
+            return "❌ Usage: /add [name1] [name2] ...\nExample: /add Alice Bob Charlie"
         }
 
         val names = parts.drop(1)
@@ -78,7 +78,7 @@ class CommandHandler(private val database: DatabaseOperations) {
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            return "📋 No participants yet.\nUse /addparticipant to add people."
+            return "📋 No participants yet.\nUse /add to add people."
         }
 
         val list = buildString {
@@ -143,7 +143,7 @@ class CommandHandler(private val database: DatabaseOperations) {
         }
 
         if (participants.isEmpty()) {
-            return "❌ No participants added. Add participants with /addparticipant"
+            return "❌ No participants added. Add participants with /add"
         }
 
         val total = expenses.sumOf { it.amount }
@@ -207,7 +207,7 @@ class CommandHandler(private val database: DatabaseOperations) {
         }
 
         if (participants.isEmpty()) {
-            return "❌ No participants added. Add participants with /addparticipant"
+            return "❌ No participants added. Add participants with /add"
         }
 
         val unpaidDebts = getUnpaidDebts(chatId)
@@ -216,11 +216,17 @@ class CommandHandler(private val database: DatabaseOperations) {
             return "✅ No one owes money!"
         }
 
+        val paymentInfo = database.getPaymentInfo(chatId)
+
         val notification = buildString {
             appendLine("🔔 Payment Reminder!")
             appendLine()
             unpaidDebts.forEach { (name, amount) ->
                 appendLine("${name} please transfer €${amount.setScale(2, RoundingMode.HALF_UP)}")
+            }
+            if (paymentInfo != null) {
+                appendLine()
+                appendLine("💳 $paymentInfo")
             }
             appendLine()
             appendLine("Use /calculate to see full breakdown")
@@ -229,16 +235,26 @@ class CommandHandler(private val database: DatabaseOperations) {
         return notification
     }
 
+    fun handleSetPayment(chatId: Long, text: String): String {
+        val info = text.substringAfter(" ", "").trim()
+        if (info.isEmpty()) {
+            return "❌ Usage: /setpayment [card number or phone]\nExample: /setpayment Card: 1234 5678 9012 3456"
+        }
+        database.setPaymentInfo(chatId, info)
+        return "✅ Payment info saved: $info"
+    }
+
     fun getHelpMessage(): String {
         return """
             🎉 Birthday Gift Bot
 
-            /addparticipant [names] - Add people (e.g. Alice Bob Charlie)
+            /add [names] - Add people (e.g. Alice Bob Charlie)
             /addexpense [name] [amount] - Record an expense
             /participants - List all participants
             /status - View all expenses
             /calculate - Calculate who owes what
             /notify - Send payment reminders
+            /setpayment [info] - Set payment details for reminders
             /reset - Clear all data
 
             💡 Use the buttons below or type commands!

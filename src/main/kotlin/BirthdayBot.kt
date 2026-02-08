@@ -42,8 +42,9 @@ class BirthdayBot(
             val commands = listOf(
                 BotCommand("start", "Show welcome message"),
                 BotCommand("addexpense", "Add an expense (name amount)"),
-                BotCommand("addparticipant", "Add participants (name1 name2 ...)"),
+                BotCommand("add", "Add participants (name1 name2 ...)"),
                 BotCommand("removeparticipant", "Remove a participant (name)"),
+                BotCommand("setpayment", "Set payment details for reminders"),
                 BotCommand("participants", "List all participants"),
                 BotCommand("status", "View all expenses"),
                 BotCommand("calculate", "Calculate who owes what"),
@@ -123,8 +124,9 @@ class BirthdayBot(
                 null
             }
             text.startsWith("/addexpense ") -> commandHandler.handleAddExpense(chatId, text)
-            text.startsWith("/addparticipant") -> commandHandler.handleAddParticipant(chatId, text)
             text.startsWith("/removeparticipant") -> commandHandler.handleRemoveParticipant(chatId, text)
+            text.startsWith("/setpayment") -> commandHandler.handleSetPayment(chatId, text)
+            text == "/add" || text.startsWith("/add ") -> commandHandler.handleAddParticipant(chatId, text)
             text == "/participants" -> {
                 sendParticipantList(chatId)
                 null
@@ -179,7 +181,7 @@ class BirthdayBot(
                 editParticipantList(chatId, messageId)
             }
             data == "add_part_hint" -> {
-                sendMessage(chatId, "Send participant names:\n/addparticipant Alice Bob Charlie")
+                sendMessage(chatId, "Send participant names:\n/add Alice Bob Charlie")
             }
             // Expense picker callbacks
             data.startsWith("expense_pick:") -> {
@@ -221,7 +223,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            sendMessage(chatId, "No participants yet. Use /addparticipant Name1 Name2 to add people.")
+            sendMessage(chatId, "No participants yet. Use /add Name1 Name2 to add people.")
             return
         }
 
@@ -249,7 +251,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            editMessage(chatId, messageId, "👥 No participants left. Use /addparticipant Name1 Name2 to add people.")
+            editMessage(chatId, messageId, "👥 No participants left. Use /add Name1 Name2 to add people.")
             return
         }
 
@@ -277,7 +279,7 @@ class BirthdayBot(
         val participants = database.getParticipants(chatId)
 
         if (participants.isEmpty()) {
-            sendMessage(chatId, "No participants yet. Add some first with /addparticipant")
+            sendMessage(chatId, "No participants yet. Add some first with /add")
             return
         }
 
