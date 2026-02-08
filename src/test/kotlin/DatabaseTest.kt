@@ -66,6 +66,35 @@ class DatabaseTest {
     }
 
     @Test
+    fun `removeExpense deletes specific expense`() {
+        val expense1 = database.addExpense(CHAT_ID, "Alice", BigDecimal("50.00"))
+        database.addExpense(CHAT_ID, "Bob", BigDecimal("30.00"))
+
+        val removed = database.removeExpense(CHAT_ID, expense1.id)
+        assertTrue(removed)
+
+        val expenses = database.getExpenses(CHAT_ID)
+        assertEquals(1, expenses.size)
+        assertEquals("Bob", expenses[0].buyerName)
+    }
+
+    @Test
+    fun `removeExpense returns false for non-existent expense`() {
+        assertFalse(database.removeExpense(CHAT_ID, 99999))
+    }
+
+    @Test
+    fun `removeExpense does not affect other chats`() {
+        val expense = database.addExpense(CHAT_ID, "Alice", BigDecimal("50.00"))
+        database.addExpense(OTHER_CHAT_ID, "Bob", BigDecimal("30.00"))
+
+        database.removeExpense(CHAT_ID, expense.id)
+
+        assertTrue(database.getExpenses(CHAT_ID).isEmpty())
+        assertEquals(1, database.getExpenses(OTHER_CHAT_ID).size)
+    }
+
+    @Test
     fun `clearExpenses removes all expenses for chat`() {
         database.addExpense(CHAT_ID, "Alice", BigDecimal("50.00"))
         database.addExpense(CHAT_ID, "Bob", BigDecimal("30.00"))

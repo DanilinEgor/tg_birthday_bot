@@ -196,7 +196,7 @@ class CommandHandlerTest {
     // --- /calculate ---
 
     @Test
-    fun `calculate with expenses and participants returns breakdown`() {
+    fun `calculate with expenses and participants returns transfer instructions`() {
         every { database.getExpenses(CHAT_ID) } returns listOf(
             Expense(1, CHAT_ID, "Alice", BigDecimal("90.00"))
         )
@@ -211,8 +211,9 @@ class CommandHandlerTest {
         assertContains(result, "Итого: €90.00")
         assertContains(result, "Участников: 3")
         assertContains(result, "На каждого: €30.00")
-        assertContains(result, "Кто должен")
-        assertContains(result, "Кому вернуть")
+        assertContains(result, "Кто кому переводит")
+        assertContains(result, "→")
+        assertContains(result, "Alice")
     }
 
     @Test
@@ -264,7 +265,30 @@ class CommandHandlerTest {
 
         val result = handler.handleCalculate(CHAT_ID)
         assertContains(result, "✅ Bob: €30.00 (оплачено)")
-        assertContains(result, "Charlie: €30.00")
+        assertContains(result, "Charlie → Alice: €30.00")
+    }
+
+    @Test
+    fun `calculate with multiple payers produces correct transfers`() {
+        // Alice paid 80, Bob paid 40, Charlie and Dave paid 0. Total = 120, per person = 30
+        // Charlie owes 30, Dave owes 30. Alice gets 50 back, Bob gets 10 back.
+        every { database.getExpenses(CHAT_ID) } returns listOf(
+            Expense(1, CHAT_ID, "Alice", BigDecimal("80.00")),
+            Expense(2, CHAT_ID, "Bob", BigDecimal("40.00"))
+        )
+        every { database.getParticipants(CHAT_ID) } returns listOf(
+            Participant(1, CHAT_ID, "Alice"),
+            Participant(2, CHAT_ID, "Bob"),
+            Participant(3, CHAT_ID, "Charlie"),
+            Participant(4, CHAT_ID, "Dave")
+        )
+        every { database.getPaidDebts(CHAT_ID) } returns emptyMap()
+
+        val result = handler.handleCalculate(CHAT_ID)
+        assertContains(result, "Кто кому переводит")
+        assertContains(result, "→")
+        // Total transfers should sum to 60 (30 from Charlie + 30 from Dave)
+        assertContains(result, "€30.00")
     }
 
     // --- /notify ---
@@ -458,10 +482,8 @@ class CommandHandlerTest {
             result = flowHandler.handleCalculate(flowChatId)
             assertContains(result, "Итого: €90.00")
             assertContains(result, "На каждого: €30.00")
-            assertContains(result, "Кто должен")
-            assertContains(result, "@Charlie: €30.00")
-            assertContains(result, "Кому вернуть")
-            assertContains(result, "@Alice: €30.00")
+            assertContains(result, "Кто кому переводит")
+            assertContains(result, "@Charlie → @Alice: €30.00")
 
             // 6. Notify - only Charlie should be reminded
             result = flowHandler.handleNotify(flowChatId)
@@ -533,7 +555,7 @@ class CommandHandlerTest {
 
             val calcResult = flowHandler.handleCalculate(flowChatId)
             assertContains(calcResult, "На каждого: €30.00")
-            assertContains(calcResult, "@Charlie: €30.00")
+            assertContains(calcResult, "→ @Alice: €30.00")
         }
 
         @Test
@@ -554,9 +576,10 @@ class CommandHandlerTest {
             assertContains(notifyResult, "@Charlie, переведи €30.00")
             assertTrue { !notifyResult.contains("@Bob, переведи") }
 
-            // Calculate shows Bob as paid
+            // Calculate shows Bob as paid and Charlie's transfer
             val calcResult = flowHandler.handleCalculate(flowChatId)
             assertContains(calcResult, "✅ @Bob: €30.00 (оплачено)")
+            assertContains(calcResult, "@Charlie → @Alice: €30.00")
 
             // getUnpaidDebts only returns Charlie
             val unpaid = flowHandler.getUnpaidDebts(flowChatId)

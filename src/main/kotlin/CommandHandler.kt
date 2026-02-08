@@ -175,25 +175,46 @@ class CommandHandler(private val database: DatabaseOperations) {
             appendLine("На каждого: €${perPerson.setScale(2, RoundingMode.HALF_UP)}")
             appendLine()
 
-            val rawOwes = rawBalances.filter { it.value < BigDecimal.ZERO }
-            val receives = rawBalances.filter { it.value > BigDecimal.ZERO }
+            // Greedy settlement based on adjusted balances
+            val debtors = adjustedBalances.filter { it.value < BigDecimal.ZERO }
+                .map { it.key to it.value.abs() }.sortedByDescending { it.second }.toMutableList()
+            val creditors = adjustedBalances.filter { it.value > BigDecimal.ZERO }
+                .map { it.key to it.value }.sortedByDescending { it.second }.toMutableList()
 
-            if (rawOwes.isEmpty()) {
+            // Show paid debts
+            val paidNames = rawBalances.filter { it.value < BigDecimal.ZERO }
+                .filter { (name, _) -> (adjustedBalances[name] ?: BigDecimal.ZERO) >= BigDecimal.ZERO }
+                .map { it.key }
+
+            if (debtors.isEmpty() && paidNames.isEmpty()) {
                 appendLine("✅ Все в расчёте!")
-            } else {
-                appendLine("💸 Кто должен:")
-                rawOwes.forEach { (name, amount) ->
-                    val adjusted = adjustedBalances[name] ?: amount
-                    if (adjusted >= BigDecimal.ZERO) {
-                        appendLine("   ✅ ${name}: €${amount.abs().setScale(2, RoundingMode.HALF_UP)} (оплачено)")
-                    } else {
-                        appendLine("   ${name}: €${adjusted.abs().setScale(2, RoundingMode.HALF_UP)}")
-                    }
+            } else if (debtors.isEmpty() && paidNames.isNotEmpty()) {
+                paidNames.forEach { name ->
+                    val rawDebt = rawBalances[name]!!.abs()
+                    appendLine("✅ $name: €${rawDebt.setScale(2, RoundingMode.HALF_UP)} (оплачено)")
                 }
-                appendLine()
-                appendLine("💰 Кому вернуть:")
-                receives.forEach { (name, amount) ->
-                    appendLine("   ${name}: €${amount.setScale(2, RoundingMode.HALF_UP)}")
+            } else {
+                appendLine("💸 Кто кому переводит:")
+                var di = 0
+                var ci = 0
+                val debtorAmounts = debtors.map { it.second }.toMutableList()
+                val creditorAmounts = creditors.map { it.second }.toMutableList()
+
+                while (di < debtors.size && ci < creditors.size) {
+                    val amount = debtorAmounts[di].min(creditorAmounts[ci])
+                    appendLine("   ${debtors[di].first} → ${creditors[ci].first}: €${amount.setScale(2, RoundingMode.HALF_UP)}")
+                    debtorAmounts[di] = debtorAmounts[di] - amount
+                    creditorAmounts[ci] = creditorAmounts[ci] - amount
+                    if (debtorAmounts[di].compareTo(BigDecimal.ZERO) == 0) di++
+                    if (creditorAmounts[ci].compareTo(BigDecimal.ZERO) == 0) ci++
+                }
+
+                if (paidNames.isNotEmpty()) {
+                    appendLine()
+                    paidNames.forEach { name ->
+                        val rawDebt = rawBalances[name]!!.abs()
+                        appendLine("✅ $name: €${rawDebt.setScale(2, RoundingMode.HALF_UP)} (оплачено)")
+                    }
                 }
             }
         }

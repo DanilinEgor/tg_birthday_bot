@@ -15,6 +15,7 @@ interface DatabaseOperations {
     fun addPaidDebt(chatId: Long, payerName: String, amount: BigDecimal)
     fun getPaidDebts(chatId: Long): Map<String, BigDecimal>
     fun clearPaidDebts(chatId: Long)
+    fun removeExpense(chatId: Long, expenseId: Int): Boolean
     fun setPaymentInfo(chatId: Long, info: String)
     fun getPaymentInfo(chatId: Long): String?
 }
@@ -22,7 +23,17 @@ interface DatabaseOperations {
 class Database(private val dbUrl: String, private val user: String, private val password: String) : DatabaseOperations {
 
     private fun getConnection(): Connection {
-        return DriverManager.getConnection(dbUrl, user, password)
+        var lastException: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                return DriverManager.getConnection(dbUrl, user, password)
+            } catch (e: Exception) {
+                lastException = e
+                System.err.println("DB connection attempt ${attempt + 1}/3 failed: ${e.message}")
+                if (attempt < 2) Thread.sleep(500)
+            }
+        }
+        throw lastException!!
     }
 
     fun initialize() {
@@ -101,6 +112,15 @@ class Database(private val dbUrl: String, private val user: String, private val 
             }
         }
         return expenses
+    }
+
+    override fun removeExpense(chatId: Long, expenseId: Int): Boolean {
+        getConnection().use { conn ->
+            val stmt = conn.prepareStatement("DELETE FROM expenses WHERE chat_id = ? AND id = ?")
+            stmt.setLong(1, chatId)
+            stmt.setInt(2, expenseId)
+            return stmt.executeUpdate() > 0
+        }
     }
 
     override fun clearExpenses(chatId: Long) {

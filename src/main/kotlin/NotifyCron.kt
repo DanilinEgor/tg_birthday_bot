@@ -5,7 +5,9 @@ import java.math.BigDecimal
 
 fun main() {
     val botToken = System.getenv("BOT_TOKEN") ?: throw IllegalArgumentException("BOT_TOKEN not set")
-    val databaseUrl = System.getenv("DATABASE_URL") ?: throw IllegalArgumentException("DATABASE_URL not set")
+    val databaseUrl = System.getenv("DATABASE_PUBLIC_URL")
+        ?: System.getenv("DATABASE_URL")
+        ?: throw IllegalArgumentException("DATABASE_PUBLIC_URL or DATABASE_URL not set")
 
     val regex = Regex("postgresql://([^:]+):([^@]+)@([^:]+):(\\d+)/(.+)")
     val matchResult = regex.find(databaseUrl) ?: throw IllegalArgumentException("Invalid DATABASE_URL format")
