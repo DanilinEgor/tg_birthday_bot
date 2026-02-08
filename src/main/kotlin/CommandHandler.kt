@@ -3,13 +3,16 @@ import java.math.RoundingMode
 
 class CommandHandler(private val database: DatabaseOperations) {
 
+    private fun normalizeUsername(name: String): String =
+        if (name.startsWith("@")) name else "@$name"
+
     fun handleAddExpense(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 3) {
-            return "❌ Usage: /addexpense [name] [amount]\nExample: /addexpense John 50"
+            return "❌ Usage: /addexpense [@username] [amount]\nExample: /addexpense @John 50"
         }
 
-        val name = parts[1]
+        val name = normalizeUsername(parts[1])
         val amount = parts[2].toBigDecimalOrNull()
 
         if (amount == null || amount <= BigDecimal.ZERO) {
@@ -27,10 +30,10 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleAddParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /add [name1] [name2] ...\nExample: /add Alice Bob Charlie"
+            return "❌ Usage: /add [@username1] [@username2] ...\nExample: /add @Alice @Bob @Charlie"
         }
 
-        val names = parts.drop(1)
+        val names = parts.drop(1).map { normalizeUsername(it) }
         if (names.size == 1) {
             val name = names[0]
             val participant = database.addParticipant(chatId, name)
@@ -61,10 +64,10 @@ class CommandHandler(private val database: DatabaseOperations) {
     fun handleRemoveParticipant(chatId: Long, text: String): String {
         val parts = text.split(" ")
         if (parts.size < 2) {
-            return "❌ Usage: /removeparticipant [name]\nExample: /removeparticipant Alice"
+            return "❌ Usage: /removeparticipant [@username]\nExample: /removeparticipant @Alice"
         }
 
-        val name = parts[1]
+        val name = normalizeUsername(parts[1])
         val removed = database.removeParticipant(chatId, name)
 
         return if (removed) {
@@ -248,8 +251,8 @@ class CommandHandler(private val database: DatabaseOperations) {
         return """
             🎉 Birthday Gift Bot
 
-            /add [names] - Add people (e.g. Alice Bob Charlie)
-            /addexpense [name] [amount] - Record an expense
+            /add [@usernames] - Add people (e.g. @Alice @Bob)
+            /addexpense [@username] [amount] - Record an expense
             /participants - List all participants
             /status - View all expenses
             /calculate - Calculate who owes what
