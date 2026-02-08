@@ -28,3 +28,13 @@ tasks.test {
 application {
     mainClass.set("BirthdayBotKt")
 }
+
+tasks.register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("notifyCronJar") {
+    archiveClassifier.set("notify-cron")
+    manifest {
+        attributes["Main-Class"] = "NotifyCronKt"
+    }
+    from(sourceSets.main.get().output)
+    configurations = listOf(project.configurations.runtimeClasspath.get())
+    mergeServiceFiles()
+}
