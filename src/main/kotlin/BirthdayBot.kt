@@ -10,7 +10,12 @@ import org.telegram.telegrambots.meta.TelegramBotsApi
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Duration
+import java.time.LocalTime
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class BirthdayBot(
     private val botToken: String,
@@ -20,9 +25,13 @@ class BirthdayBot(
 ) : TelegramLongPollingBot() {
 
     private val pendingExpense = ConcurrentHashMap<Long, String>()
+    private val scheduler = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "daily-notify").apply { isDaemon = true }
+    }
 
     init {
         setupCommands()
+        scheduleDailyNotifications()
     }
 
     override fun getBotToken(): String = botToken
@@ -43,6 +52,39 @@ class BirthdayBot(
                 BotCommand("help", "Show help message")
             )
             execute(SetMyCommands().apply { this.commands = commands })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun scheduleDailyNotifications() {
+        val notifyTime = LocalTime.of(10, 0) // 10:00 AM UTC
+        val zone = ZoneId.of("UTC")
+        val now = java.time.ZonedDateTime.now(zone)
+        var nextRun = now.with(notifyTime)
+        if (now >= nextRun) {
+            nextRun = nextRun.plusDays(1)
+        }
+        val initialDelay = Duration.between(now, nextRun).seconds
+
+        scheduler.scheduleAtFixedRate(
+            { sendDailyNotifications() },
+            initialDelay,
+            TimeUnit.DAYS.toSeconds(1),
+            TimeUnit.SECONDS
+        )
+        println("Daily notifications scheduled at 10:00 UTC (first run in ${initialDelay / 3600}h ${(initialDelay % 3600) / 60}m)")
+    }
+
+    private fun sendDailyNotifications() {
+        try {
+            val chatIds = database.getActiveChatIds()
+            for (chatId in chatIds) {
+                val message = commandHandler.handleNotify(chatId)
+                if (!message.startsWith("❌") && !message.contains("No one owes money")) {
+                    sendMessage(chatId, message)
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }

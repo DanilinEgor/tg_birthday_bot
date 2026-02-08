@@ -11,6 +11,7 @@ interface DatabaseOperations {
     fun removeParticipant(chatId: Long, name: String): Boolean
     fun getParticipants(chatId: Long): List<Participant>
     fun clearParticipants(chatId: Long)
+    fun getActiveChatIds(): List<Long>
 }
 
 class Database(private val dbUrl: String, private val user: String, private val password: String) : DatabaseOperations {
@@ -143,5 +144,16 @@ class Database(private val dbUrl: String, private val user: String, private val 
             stmt.setLong(1, chatId)
             stmt.executeUpdate()
         }
+    }
+
+    override fun getActiveChatIds(): List<Long> {
+        val chatIds = mutableSetOf<Long>()
+        getConnection().use { conn ->
+            val rs = conn.createStatement().executeQuery("SELECT DISTINCT chat_id FROM expenses")
+            while (rs.next()) {
+                chatIds.add(rs.getLong("chat_id"))
+            }
+        }
+        return chatIds.toList()
     }
 }
