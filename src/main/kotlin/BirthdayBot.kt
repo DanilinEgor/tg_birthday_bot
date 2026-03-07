@@ -35,7 +35,8 @@ class BirthdayBot(
                 BotCommand("addexpense", "Добавить расход (@юзер сумма)"),
                 BotCommand("add", "Добавить участников (@юзер1 @юзер2 ...)"),
                 BotCommand("removeparticipant", "Удалить участника (@юзер)"),
-                BotCommand("setpayment", "Реквизиты для перевода"),
+                BotCommand("setpayment", "Установить реквизиты"),
+                BotCommand("getpayment", "Показать реквизиты"),
                 BotCommand("participants", "Список участников"),
                 BotCommand("status", "Все расходы"),
                 BotCommand("calculate", "Расчёт долгов"),
@@ -84,6 +85,7 @@ class BirthdayBot(
             text.startsWith("/addexpense ") -> commandHandler.handleAddExpense(chatId, text)
             text.startsWith("/removeparticipant") -> commandHandler.handleRemoveParticipant(chatId, text)
             text.startsWith("/setpayment") -> commandHandler.handleSetPayment(chatId, text)
+            text == "/getpayment" -> commandHandler.handleGetPayment(chatId)
             text == "/add" || text.startsWith("/add ") -> commandHandler.handleAddParticipant(chatId, text)
             text == "/participants" -> {
                 sendParticipantList(chatId)

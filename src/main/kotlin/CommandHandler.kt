@@ -268,6 +268,15 @@ class CommandHandler(private val database: DatabaseOperations) {
         return "✅ Реквизиты сохранены: $info"
     }
 
+    fun handleGetPayment(chatId: Long): String {
+        val info = database.getPaymentInfo(chatId)
+        return if (info != null) {
+            "💳 Реквизиты для перевода:\n$info"
+        } else {
+            "❌ Реквизиты не заданы. Установи через /setpayment"
+        }
+    }
+
     fun getHelpMessage(): String {
         return """
             🎉 Бот для совместных расходов
@@ -284,7 +293,8 @@ class CommandHandler(private val database: DatabaseOperations) {
             /status — все расходы
             /calculate — расчёт долгов
             /notify — напомнить должникам
-            /setpayment — реквизиты для перевода
+            /setpayment — установить реквизиты для перевода
+            /getpayment — показать реквизиты
             /reset — очистить все данные
 
             💡 Используй кнопки ниже!
